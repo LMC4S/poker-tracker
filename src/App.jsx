@@ -27,7 +27,17 @@ const fmtMoney = (n) => {
   const v = Math.abs(n);
   return v % 1 === 0 ? `$${v}` : `$${v.toFixed(2)}`;
 };
-const profitColor = (n) => (n > 0 ? "#4ade80" : n < 0 ? "#f87171" : "#a1a1aa");
+const profitColor = () => "#2a0a08";
+
+// Interpolates red(r=-1) → beige(r=0) → green(r=+1), matching app palette
+const corrColor = (r) => {
+  if (r === null) return "#e8d8c0";
+  const t = (r + 1) / 2;
+  const from = t < 0.5 ? [[220,100,90],[240,220,190]] : [[240,220,190],[130,190,130]];
+  const u = t < 0.5 ? t * 2 : (t - 0.5) * 2;
+  const rgb = from[0].map((c, i) => Math.round(c + (from[1][i] - c) * u));
+  return `rgb(${rgb.join(",")})`;
+};
 
 const CHART_COLORS = ["#4ade80", "#60a5fa", "#f59e0b", "#f87171", "#a78bfa", "#34d399", "#fb923c", "#e879f9", "#38bdf8", "#fbbf24"];
 
@@ -48,7 +58,7 @@ async function loadSessions() {
     }
   } catch (e) {
     console.error("Load failed:", e);
-    return [];
+    return null; // null = load error, distinct from [] = genuinely empty
   }
 }
 
@@ -154,11 +164,10 @@ function PinGate({ children }) {
   const remaining = lockedUntil ? Math.ceil((lockedUntil - Date.now()) / 1000) : null;
 
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#0c0f14" }}>
-      <div style={{ background: "#141820", border: "1px solid #1f2937", borderRadius: 20, padding: "40px 32px", width: "100%", maxWidth: 320, textAlign: "center" }}>
-        <div style={{ fontSize: 40, marginBottom: 8 }}>♠</div>
-        <div style={{ fontSize: 20, fontWeight: 700, color: "#e5e7eb", marginBottom: 4 }}>Poker Tracker</div>
-        <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 28 }}>Enter password to continue</div>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#fbf0df" }}>
+      <div style={{ background: "#f0e0c4", border: "1px solid #d4b898", borderRadius: 16, padding: "48px 36px", width: "100%", maxWidth: 340, textAlign: "center" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#7a5030", letterSpacing: "4px", textTransform: "uppercase", marginBottom: 6, fontFamily: FB }}>Home Game</div>
+        <div style={{ fontSize: 34, fontWeight: 900, color: "#2a0a08", letterSpacing: "4px", textTransform: "uppercase", marginBottom: 32, fontFamily: FB }}>Tracker</div>
         <input
           autoFocus
           type="password"
@@ -168,19 +177,27 @@ function PinGate({ children }) {
           disabled={!!lockedUntil}
           placeholder="Password"
           style={{
-            width: "100%", padding: "14px", fontSize: 15,
-            background: "#0c0f14", border: `1px solid ${error ? "#f87171" : "#2d3748"}`,
-            borderRadius: 10, color: "#e5e7eb", outline: "none", boxSizing: "border-box",
-            marginBottom: 12, transition: "border-color 0.2s", opacity: lockedUntil ? 0.4 : 1
+            width: "100%", padding: "14px", fontSize: 16,
+            background: "#fbf0df", border: `1px solid ${error ? "#c0392b" : "#d4b898"}`,
+            borderRadius: 8, color: "#2a0a08", outline: "none", boxSizing: "border-box",
+            marginBottom: 12, transition: "border-color 0.2s", opacity: lockedUntil ? 0.4 : 1,
+            fontFamily: F, letterSpacing: "2px"
           }}
         />
-        {error && <div style={{ color: "#f87171", fontSize: 12, marginBottom: 10, lineHeight: 1.4 }}>{error}{remaining ? ` (${remaining}s)` : ""}</div>}
+        {error && <div style={{ color: "#c0392b", fontSize: 11, marginBottom: 10, lineHeight: 1.5, letterSpacing: "0.5px" }}>{error}{remaining ? ` (${remaining}s)` : ""}</div>}
         <button
           onClick={submit}
           disabled={!!lockedUntil || !input}
-          style={{ width: "100%", padding: "13px", background: lockedUntil ? "#1f2937" : "#166534", color: lockedUntil ? "#4b5563" : "#fff", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: lockedUntil ? "not-allowed" : "pointer" }}
+          style={{
+            width: "100%", padding: "13px",
+            background: lockedUntil ? "#f0e0c4" : "#450206",
+            color: lockedUntil ? "#7a5030" : "#ffffff",
+            border: lockedUntil ? "1px solid #d4b898" : "none",
+            borderRadius: 24, fontSize: 11, fontWeight: 700, cursor: lockedUntil ? "not-allowed" : "pointer",
+            letterSpacing: "3px", textTransform: "uppercase", fontFamily: F
+          }}
         >
-          {lockedUntil ? `Locked (${remaining}s)` : "Unlock"}
+          {lockedUntil ? `Locked (${remaining}s)` : "Enter"}
         </button>
       </div>
     </div>
@@ -193,11 +210,17 @@ export default function PokerTracker() {
   const [view, setView] = useState("home");
   const [activeId, setActiveId] = useState(null);
   const [loaded, setLoaded] = useState(false);
+  const [saveEnabled, setSaveEnabled] = useState(false);
   const [modal, setModal] = useState(null);
   const [summaryId, setSummaryId] = useState(null);
 
-  useEffect(() => { loadSessions().then(s => { setSessions(s); setLoaded(true); }); }, []);
-  useEffect(() => { if (loaded) saveSessions(sessions); }, [sessions, loaded]);
+  useEffect(() => {
+    loadSessions().then(s => {
+      if (s !== null) { setSessions(s); setSaveEnabled(true); }
+      setLoaded(true);
+    });
+  }, []);
+  useEffect(() => { if (saveEnabled) saveSessions(sessions); }, [sessions, saveEnabled]);
 
   const activeSession = sessions.find(s => s.id === activeId);
   const summarySession = sessions.find(s => s.id === summaryId);
@@ -256,15 +279,14 @@ function Header({ view, setView, activeId, hasEnded, isSuperAdmin }) {
   return (
     <div style={S.header}>
       <div style={S.headerLeft}>
-        <span style={S.logo}>♠</span>
-        <span style={S.title}>Poker Tracker</span>
+        <span style={S.title}>Home Game Tracker</span>
       </div>
       <div style={S.nav}>
         <NavBtn label="Home" active={view === "home"} onClick={() => setView("home")} />
         {activeId && <NavBtn label="Session" active={view === "active"} onClick={() => setView("active")} />}
         {isSuperAdmin && <NavBtn label="History" active={view === "history"} onClick={() => setView("history")} />}
         {isSuperAdmin && <NavBtn label="Players" active={view === "players"} onClick={() => setView("players")} />}
-        {hasEnded && <NavBtn label="Stats" active={view === "analytics"} onClick={() => setView("analytics")} />}
+        {isSuperAdmin && hasEnded && <NavBtn label="Stats" active={view === "analytics"} onClick={() => setView("analytics")} />}
       </div>
     </div>
   );
@@ -277,7 +299,7 @@ function NavBtn({ label, active, onClick }) {
 // ─── Home View ───
 function HomeView({ sessions, isAdmin, onNew, onOpen, onDelete }) {
   const activeSessions = sessions.filter(s => !s.ended);
-  const recentEnded = sessions.filter(s => s.ended).slice(0, 3);
+  const recentEnded = sessions.filter(s => s.ended).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 3);
   return (
     <div style={S.content}>
       {isAdmin && <button onClick={onNew} style={S.newBtn}><PlusIcon size={20}/> New Session</button>}
@@ -296,7 +318,7 @@ function HomeView({ sessions, isAdmin, onNew, onOpen, onDelete }) {
       {sessions.length === 0 && (
         <div style={S.empty}>
           <span style={{ fontSize: 48, opacity: 0.3 }}>♠♥♣♦</span>
-          <p style={{ color: "#9ca3af", marginTop: 12 }}>No sessions yet. Start your first game!</p>
+          <p style={{ color: "#7a5030", marginTop: 12 }}>No sessions yet. Start your first game!</p>
         </div>
       )}
     </div>
@@ -318,7 +340,7 @@ function SessionCard({ session, onClick, onDelete, isAdmin }) {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {!session.ended && <span style={S.liveBadge}>LIVE</span>}
           <span style={S.cardPot}>{fmtMoney(totalPot)}</span>
-          {isAdmin && <button onClick={e => { e.stopPropagation(); onDelete(); }} style={S.iconBtn}><TrashIcon size={14} color="#6b7280"/></button>}
+          {isAdmin && <button onClick={e => { e.stopPropagation(); onDelete(); }} style={S.iconBtn}><TrashIcon size={14} color="#707070"/></button>}
         </div>
       </div>
     </div>
@@ -353,9 +375,9 @@ function ActiveView({ session, isAdmin, updateSession, setModal, onEnd }) {
       </div>
 
       <div style={S.statsRow}>
-        <StatBox label="Total Pot" value={fmtMoney(totalBuyins)} />
+        <StatBox label="Total Buy-in" value={fmtMoney(totalBuyins)} />
         <StatBox label="Cashed Out" value={`${cashedOutCount}/${session.players.length}`} />
-        {allCashedOut && <StatBox label="Balance" value={balance === 0 ? "✓ OK" : `⚠ ${fmt(balance)}`} color={balance === 0 ? "#4ade80" : "#f59e0b"} />}
+        {allCashedOut && <StatBox label="Balance" value={balance === 0 ? "✓ OK" : `⚠ ${fmt(balance)}`} color="#ffffff" />}
       </div>
 
       <div style={S.actions}>
@@ -378,20 +400,20 @@ function ActiveView({ session, isAdmin, updateSession, setModal, onEnd }) {
             const profit = p.cashout !== null ? p.cashout - totalBuyin : null;
             return (
               <div key={p.id} style={S.tableRow}>
-                <span style={{ flex: 2, fontWeight: 600, color: "#e5e7eb" }}>{p.name}</span>
-                <span style={{ flex: 2, textAlign: "right", color: "#d1d5db" }}>
+                <span style={{ flex: 2, fontWeight: 600, color: "#2a0a08" }}>{p.name}</span>
+                <span style={{ flex: 2, textAlign: "right", color: "#2a0a08" }}>
                   {fmtMoney(totalBuyin)}
-                  {p.buyins.length > 1 && <span style={{ color: "#6b7280", fontSize: 11, marginLeft: 4 }}>({p.buyins.map(b => fmtMoney(b)).join(" + ")})</span>}
+                  {p.buyins.length > 1 && <span style={{ color: "#7a5030", fontSize: 11, marginLeft: 4 }}>({p.buyins.map(b => fmtMoney(b)).join(" + ")})</span>}
                 </span>
-                <span style={{ flex: 1.5, textAlign: "right", color: p.cashout !== null ? "#d1d5db" : "#4b5563" }}>
+                <span style={{ flex: 1.5, textAlign: "right", color: p.cashout !== null ? "#2a0a08" : "#7a5030" }}>
                   {p.cashout !== null ? fmtMoney(p.cashout) : "—"}
                   {isAdmin && p.cashout !== null && <button onClick={() => undoCashout(p.id)} style={{ ...S.tinyBtn, marginLeft: 4 }} title="Undo">↩</button>}
                 </span>
-                <span style={{ flex: 1.5, textAlign: "right", fontWeight: 600, color: profit !== null ? profitColor(profit) : "#4b5563" }}>
+                <span style={{ flex: 1.5, textAlign: "right", fontWeight: 600, color: profit !== null ? profitColor(profit) : "#707070" }}>
                   {profit !== null ? fmt(profit) : "—"}
                 </span>
                 <span style={{ flex: 0.5, textAlign: "right" }}>
-                  {isAdmin && p.cashout === null && <button onClick={() => removePlayer(p.id)} style={S.tinyBtn}><TrashIcon size={12} color="#6b7280"/></button>}
+                  {isAdmin && p.cashout === null && <button onClick={() => removePlayer(p.id)} style={S.tinyBtn}><TrashIcon size={12} color="#707070"/></button>}
                 </span>
               </div>
             );
@@ -400,12 +422,12 @@ function ActiveView({ session, isAdmin, updateSession, setModal, onEnd }) {
             <span style={{ flex: 2, fontWeight: 700 }}>Total</span>
             <span style={{ flex: 2, textAlign: "right", fontWeight: 700 }}>{fmtMoney(totalBuyins)}</span>
             <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700 }}>{cashedOutCount > 0 ? fmtMoney(totalCashouts) : "—"}</span>
-            <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700, color: allCashedOut ? profitColor(balance) : "#4b5563" }}>{allCashedOut ? fmt(balance) : "—"}</span>
+            <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700, color: allCashedOut ? profitColor(balance) : "#707070" }}>{allCashedOut ? fmt(balance) : "—"}</span>
             <span style={{ flex: 0.5 }}/>
           </div>
         </div>
       ) : (
-        <div style={S.empty}><p style={{ color: "#6b7280" }}>Add players to get started</p></div>
+        <div style={S.empty}><p style={{ color: "#707070" }}>Add players to get started</p></div>
       )}
 
       {session.players.length > 0 && isAdmin && (
@@ -453,13 +475,13 @@ function SummaryView({ session, isAdmin, onResume, onBack }) {
             <div style={S.summaryStatVal}>{session.players.length}</div>
           </div>
           <div style={S.summaryStatBox}>
-            <div style={S.summaryStatLabel}>Total Pot</div>
+            <div style={S.summaryStatLabel}>Total Buy-in</div>
             <div style={S.summaryStatVal}>{fmtMoney(totalBuyins)}</div>
           </div>
           {allCashedOut && (
             <div style={S.summaryStatBox}>
               <div style={S.summaryStatLabel}>Balance</div>
-              <div style={{ ...S.summaryStatVal, color: balance === 0 ? "#4ade80" : "#f59e0b" }}>{balance === 0 ? "✓" : `⚠ ${fmt(balance)}`}</div>
+              <div style={{ ...S.summaryStatVal, color: "#2a0a08" }}>{balance === 0 ? "✓" : `⚠ ${fmt(balance)}`}</div>
             </div>
           )}
         </div>
@@ -475,14 +497,14 @@ function SummaryView({ session, isAdmin, onResume, onBack }) {
             const totalBuyin = p.buyins.reduce((a, x) => a + x, 0);
             const profit = p.cashout !== null ? p.cashout - totalBuyin : null;
             return (
-              <div key={p.id} style={{ ...S.summaryTableRow, ...(i === 0 && profit > 0 ? { background: "rgba(74,222,128,0.06)" } : {}), ...(i === sorted.length - 1 && profit < 0 ? { background: "rgba(248,113,113,0.06)" } : {}) }}>
-                <span style={{ flex: 0.4, textAlign: "center", color: "#6b7280", fontSize: 12 }}>{i + 1}</span>
-                <span style={{ flex: 2, fontWeight: 600, color: "#e5e7eb" }}>
+              <div key={p.id} style={S.summaryTableRow}>
+                <span style={{ flex: 0.4, textAlign: "center", color: "#7a5030", fontSize: 12 }}>{i + 1}</span>
+                <span style={{ flex: 2, fontWeight: 600, color: "#2a0a08" }}>
                   {p.name}{i === 0 && profit > 0 && <span style={{ marginLeft: 6, fontSize: 12 }}>👑</span>}
                 </span>
-                <span style={{ flex: 1.5, textAlign: "right", color: "#9ca3af" }}>{fmtMoney(totalBuyin)}</span>
-                <span style={{ flex: 1.5, textAlign: "right", color: "#9ca3af" }}>{p.cashout !== null ? fmtMoney(p.cashout) : "—"}</span>
-                <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700, color: profit !== null ? profitColor(profit) : "#4b5563", fontSize: 15 }}>{profit !== null ? fmt(profit) : "—"}</span>
+                <span style={{ flex: 1.5, textAlign: "right", color: "#2a0a08" }}>{fmtMoney(totalBuyin)}</span>
+                <span style={{ flex: 1.5, textAlign: "right", color: "#2a0a08" }}>{p.cashout !== null ? fmtMoney(p.cashout) : "—"}</span>
+                <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700, color: profit !== null ? profitColor(profit) : "#707070", fontSize: 15 }}>{profit !== null ? fmt(profit) : "—"}</span>
               </div>
             );
           })}
@@ -491,10 +513,10 @@ function SummaryView({ session, isAdmin, onResume, onBack }) {
             <span style={{ flex: 2, fontWeight: 700 }}>Total</span>
             <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700 }}>{fmtMoney(totalBuyins)}</span>
             <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700 }}>{fmtMoney(totalCashouts)}</span>
-            <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700, color: allCashedOut ? profitColor(balance) : "#4b5563" }}>{allCashedOut ? fmt(balance) : "—"}</span>
+            <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700, color: allCashedOut ? profitColor(balance) : "#707070" }}>{allCashedOut ? fmt(balance) : "—"}</span>
           </div>
         </div>
-        <div style={S.summaryFooter}>Poker Tracker · {new Date(session.date).toLocaleDateString()}</div>
+        <div style={S.summaryFooter}>Home Game Tracker · {new Date(session.date).toLocaleDateString()}</div>
       </div>
       <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
         <button onClick={onBack} style={S.actionBtnAlt}><ChevronIcon dir="left" size={14}/> Home</button>
@@ -508,7 +530,7 @@ function SummaryView({ session, isAdmin, onResume, onBack }) {
 function HistoryView({ sessions, isAdmin, onOpen, onDelete }) {
   const ended = sessions.filter(s => s.ended);
   if (ended.length === 0) return (
-    <div style={S.content}><div style={S.empty}><p style={{ color: "#6b7280" }}>No completed sessions yet</p></div></div>
+    <div style={S.content}><div style={S.empty}><p style={{ color: "#707070" }}>No completed sessions yet</p></div></div>
   );
 
   const playerStats = {};
@@ -541,10 +563,10 @@ function HistoryView({ sessions, isAdmin, onOpen, onDelete }) {
             </div>
             {leaderboard.map(([name, st], i) => (
               <div key={name} style={S.tableRow}>
-                <span style={{ flex: 0.3, textAlign: "center", color: "#6b7280" }}>{i + 1}</span>
-                <span style={{ flex: 2, fontWeight: 600, color: "#e5e7eb" }}>{name}{i === 0 && " 👑"}</span>
-                <span style={{ flex: 1, textAlign: "right", color: "#9ca3af" }}>{st.sessions}</span>
-                <span style={{ flex: 1, textAlign: "right", color: "#9ca3af" }}>{Math.round(st.wins / st.sessions * 100)}%</span>
+                <span style={{ flex: 0.3, textAlign: "center", color: "#7a5030" }}>{i + 1}</span>
+                <span style={{ flex: 2, fontWeight: 600, color: "#2a0a08" }}>{name}{i === 0 && " 👑"}</span>
+                <span style={{ flex: 1, textAlign: "right", color: "#2a0a08" }}>{st.sessions}</span>
+                <span style={{ flex: 1, textAlign: "right", color: "#2a0a08" }}>{Math.round(st.wins / st.sessions * 100)}%</span>
                 <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700, color: profitColor(st.totalProfit) }}>{fmt(st.totalProfit)}</span>
               </div>
             ))}
@@ -562,11 +584,11 @@ function HistoryView({ sessions, isAdmin, onOpen, onDelete }) {
 // ─── Limited Stats View (admin + view-only) ───
 function HighlightCard({ emoji, label, value }) {
   return (
-    <div style={{ background: "#141820", border: "1px solid #1f2937", borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+    <div style={{ background: "#f0e0c4", border: "1px solid #d4b898", borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
       <span style={{ fontSize: 24 }}>{emoji}</span>
       <div>
-        <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.8 }}>{label}</div>
-        <div style={{ fontSize: 15, fontWeight: 600, color: "#e5e7eb", marginTop: 2 }}>{value}</div>
+        <div style={{ fontSize: 11, color: "#7a5030", textTransform: "uppercase", letterSpacing: 0.8, fontFamily: F }}>{label}</div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "#450206", marginTop: 2 }}>{value}</div>
       </div>
     </div>
   );
@@ -576,7 +598,7 @@ function LimitedStatsView({ sessions, isAdmin, onExport }) {
   const window4 = useMemo(() =>
     sessions.filter(s => s.ended)
       .sort((a, b) => new Date(a.date) - new Date(b.date))
-      .slice(-4),
+      .slice(-8),
     [sessions]
   );
 
@@ -612,13 +634,17 @@ function LimitedStatsView({ sessions, isAdmin, onExport }) {
   const highlights = useMemo(() => {
     if (allPlayerNames.length === 0) return null;
 
-    // Hot streak: most consecutive profitable sessions
+    // Hot streak: consecutive wins ending at their most recent session
     let hotPlayer = ""; let hotCount = 0;
     allPlayerNames.forEach(name => {
-      const sp = sessionProfits[name].filter(x => x !== null);
-      let max = 0, cur = 0;
-      sp.forEach(p => { if (p > 0) { cur++; max = Math.max(max, cur); } else cur = 0; });
-      if (max > hotCount) { hotCount = max; hotPlayer = name; }
+      const sp = sessionProfits[name];
+      let cur = 0;
+      for (let i = sp.length - 1; i >= 0; i--) {
+        if (sp[i] === null) continue; // didn't attend, skip
+        if (sp[i] > 0) cur++;
+        else break; // lost, streak ends
+      }
+      if (cur > hotCount) { hotCount = cur; hotPlayer = name; }
     });
 
     // Best single session win
@@ -650,12 +676,46 @@ function LimitedStatsView({ sessions, isAdmin, onExport }) {
   }, [allPlayerNames, sessionProfits, playerStats]);
 
   if (window4.length === 0) return (
-    <div style={S.content}><div style={S.empty}><p style={{ color: "#6b7280" }}>Need completed sessions for stats</p></div></div>
+    <div style={S.content}><div style={S.empty}><p style={{ color: "#707070" }}>Need completed sessions for stats</p></div></div>
   );
 
-  const detailedStats = allPlayerNames
-    .map(name => ({ name, ...playerStats[name] }))
-    .sort((a, b) => b.totalProfit - a.totalProfit);
+  const correlationData = useMemo(() => {
+    const regulars = allPlayerNames
+      .filter(name => playerStats[name].sessions >= 2)
+      .sort((a, b) => playerStats[b].sessions - playerStats[a].sessions);
+
+    const matrix = {};
+    regulars.forEach(a => {
+      matrix[a] = {};
+      regulars.forEach(b => {
+        if (a === b) { matrix[a][b] = 1; return; }
+        const pairs = window4.map(s => {
+          const pa = s.players.find(x => x.name === a && x.cashout !== null);
+          const pb = s.players.find(x => x.name === b && x.cashout !== null);
+          if (!pa || !pb) return null;
+          return [pa.cashout - pa.buyins.reduce((s, x) => s + x, 0), pb.cashout - pb.buyins.reduce((s, x) => s + x, 0)];
+        }).filter(Boolean);
+        if (pairs.length < 2) { matrix[a][b] = null; return; }
+        const xs = pairs.map(p => p[0]), ys = pairs.map(p => p[1]);
+        const mx = xs.reduce((a, b) => a + b, 0) / xs.length;
+        const my = ys.reduce((a, b) => a + b, 0) / ys.length;
+        const num = xs.reduce((s, x, i) => s + (x - mx) * (ys[i] - my), 0);
+        const den = Math.sqrt(xs.reduce((s, x) => s + (x - mx) ** 2, 0) * ys.reduce((s, y) => s + (y - my) ** 2, 0));
+        matrix[a][b] = den === 0 ? null : +(num / den).toFixed(2);
+      });
+    });
+
+    let topAllied = null, topAlliedR = -Infinity, topRival = null, topRivalR = Infinity;
+    for (let i = 0; i < regulars.length; i++) {
+      for (let j = i + 1; j < regulars.length; j++) {
+        const r = matrix[regulars[i]][regulars[j]];
+        if (r === null) continue;
+        if (r > topAlliedR) { topAlliedR = r; topAllied = `${regulars[i]} & ${regulars[j]}`; }
+        if (r < topRivalR)  { topRivalR = r;  topRival  = `${regulars[i]} & ${regulars[j]}`; }
+      }
+    }
+    return { regulars, matrix, topAllied: topAlliedR > 0.3 ? topAllied : null, topRival: topRivalR < -0.3 ? topRival : null };
+  }, [allPlayerNames, playerStats, window4]);
 
   return (
     <div style={S.content}>
@@ -672,27 +732,54 @@ function LimitedStatsView({ sessions, isAdmin, onExport }) {
       )}
 
       <div style={S.section}>
-        <h3 style={S.sectionTitle}>Player Stats · Last {window4.length} Session{window4.length !== 1 ? "s" : ""}</h3>
-        <div style={{ overflowX: "auto" }}>
-          <div style={{ ...S.table, minWidth: 380 }}>
-            <div style={S.tableHead}>
-              <span style={{ flex: 1.8 }}>Player</span>
-              <span style={{ flex: 0.7, textAlign: "right" }}>Sess.</span>
-              <span style={{ flex: 0.8, textAlign: "right" }}>Win %</span>
-              <span style={{ flex: 1.2, textAlign: "right" }}>Net</span>
-              <span style={{ flex: 1, textAlign: "right" }}>Avg</span>
+        <h3 style={S.sectionTitle}>Profit Correlation · Last {window4.length} Sessions</h3>
+        <p style={{ fontSize: 12, color: "#7a5030", margin: "0 0 12px" }}>Regulars only (2+ sessions). Green = tend to win/lose together · Red = natural rivals · Grey = too few shared sessions</p>
+        {correlationData.regulars.length < 2 ? (
+          <p style={{ color: "#707070", fontSize: 14 }}>Not enough data yet</p>
+        ) : (
+          <>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ borderCollapse: "separate", borderSpacing: 3, fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    <th style={{ minWidth: 72 }} />
+                    {correlationData.regulars.map(name => (
+                      <th key={name} style={{ minWidth: 44, padding: "2px 4px", textAlign: "center", color: "#7a5030", fontWeight: 600, fontSize: 11 }}>
+                        {name.length > 5 ? name.slice(0, 4) + "." : name}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {correlationData.regulars.map(a => (
+                    <tr key={a}>
+                      <td style={{ paddingRight: 8, fontWeight: 600, color: "#2a0a08", fontSize: 12, whiteSpace: "nowrap" }}>{a}</td>
+                      {correlationData.regulars.map(b => {
+                        const r = correlationData.matrix[a][b];
+                        const isDiag = a === b;
+                        return (
+                          <td key={b} style={{
+                            width: 44, height: 34, background: isDiag ? "#d4b898" : corrColor(r),
+                            textAlign: "center", color: "#2a0a08", fontWeight: isDiag ? 700 : 500,
+                            fontSize: 11, borderRadius: 4, padding: "2px 4px",
+                          }}>
+                            {isDiag ? "—" : r === null ? "·" : (r >= 0 ? "+" : "") + r.toFixed(1)}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            {detailedStats.map((st, i) => (
-              <div key={st.name} style={S.tableRow}>
-                <span style={{ flex: 1.8, fontWeight: 600, color: "#e5e7eb" }}>{i === 0 && "👑 "}{st.name}</span>
-                <span style={{ flex: 0.7, textAlign: "right", color: "#9ca3af" }}>{st.sessions}</span>
-                <span style={{ flex: 0.8, textAlign: "right", color: "#9ca3af" }}>{Math.round(st.wins / st.sessions * 100)}%</span>
-                <span style={{ flex: 1.2, textAlign: "right", fontWeight: 700, color: profitColor(st.totalProfit) }}>{fmt(st.totalProfit)}</span>
-                <span style={{ flex: 1, textAlign: "right", color: profitColor(st.totalProfit / st.sessions) }}>{fmt(Math.round(st.totalProfit / st.sessions * 100) / 100)}</span>
+            {(correlationData.topAllied || correlationData.topRival) && (
+              <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {correlationData.topAllied && <span style={{ background: "#c8e6c9", borderRadius: 8, padding: "5px 12px", fontSize: 13, color: "#2a0a08" }}>🤝 Allies: {correlationData.topAllied}</span>}
+                {correlationData.topRival  && <span style={{ background: "#ffcdd2", borderRadius: 8, padding: "5px 12px", fontSize: 13, color: "#2a0a08" }}>⚔️ Rivals: {correlationData.topRival}</span>}
               </div>
-            ))}
-          </div>
-        </div>
+            )}
+          </>
+        )}
       </div>
 
       {isAdmin && (
@@ -773,9 +860,9 @@ function AnalyticsView({ sessions, isAdmin, isSuperAdmin, onExport }) {
     if (!active || !payload?.length) return null;
     const point = payload[0]?.payload;
     return (
-      <div style={{ background: "#1a1f2b", border: "1px solid #2d3748", borderRadius: 8, padding: "10px 14px", fontSize: 12 }}>
-        <div style={{ fontWeight: 700, color: "#e5e7eb", marginBottom: 6 }}>{point?.fullLabel || point?.label || label}</div>
-        {point?.date && <div style={{ color: "#6b7280", marginBottom: 6 }}>{point.date}</div>}
+      <div style={{ background: "#f0e0c4", border: "1px solid #d4b898", borderRadius: 8, padding: "10px 14px", fontSize: 12 }}>
+        <div style={{ fontWeight: 700, color: "#2a0a08", marginBottom: 6 }}>{point?.fullLabel || point?.label || label}</div>
+        {point?.date && <div style={{ color: "#707070", marginBottom: 6 }}>{point.date}</div>}
         {payload.sort((a, b) => b.value - a.value).map((p, i) => (
           <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 16, color: p.color, marginBottom: 2 }}>
             <span>{p.dataKey}</span>
@@ -789,7 +876,7 @@ function AnalyticsView({ sessions, isAdmin, isSuperAdmin, onExport }) {
   if (!isSuperAdmin) return <LimitedStatsView sessions={sessions} isAdmin={isAdmin} onExport={onExport} />;
 
   if (ended.length === 0) return (
-    <div style={S.content}><div style={S.empty}><p style={{ color: "#6b7280" }}>Need completed sessions for analytics</p></div></div>
+    <div style={S.content}><div style={S.empty}><p style={{ color: "#707070" }}>Need completed sessions for analytics</p></div></div>
   );
 
   const detailedStats = allPlayerNames
@@ -805,10 +892,10 @@ function AnalyticsView({ sessions, isAdmin, isSuperAdmin, onExport }) {
             <div style={{ width: "100%", height: 280 }}>
               <ResponsiveContainer>
                 <LineChart data={cumulativeData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                  <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={{ stroke: "#1f2937" }} tickLine={false} />
-                  <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={{ stroke: "#1f2937" }} tickLine={false} tickFormatter={v => v === 0 ? "0" : fmt(v)} />
+                  <XAxis dataKey="date" tick={{ fill: "#707070", fontSize: 11 }} axisLine={{ stroke: "#3d1515" }} tickLine={false} />
+                  <YAxis tick={{ fill: "#707070", fontSize: 11 }} axisLine={{ stroke: "#3d1515" }} tickLine={false} tickFormatter={v => v === 0 ? "0" : fmt(v)} />
                   <Tooltip content={<CustomTooltip />} />
-                  <ReferenceLine y={0} stroke="#374151" strokeDasharray="3 3" />
+                  <ReferenceLine y={0} stroke="#3d1515" strokeDasharray="3 3" />
                   {visibleRegulars.map((name) => (
                     <Line
                       key={name}
@@ -824,7 +911,7 @@ function AnalyticsView({ sessions, isAdmin, isSuperAdmin, onExport }) {
                 </LineChart>
               </ResponsiveContainer>
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12, paddingTop: 12, borderTop: "1px solid #1f2937" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12, paddingTop: 12, borderTop: "1px solid #d4b898" }}>
               {regulars.map((name, i) => {
                 const isHidden = hiddenPlayers.has(name);
                 const color = CHART_COLORS[i % CHART_COLORS.length];
@@ -834,20 +921,20 @@ function AnalyticsView({ sessions, isAdmin, isSuperAdmin, onExport }) {
                     onClick={() => togglePlayer(name)}
                     style={{
                       display: "flex", alignItems: "center", gap: 5,
-                      padding: "4px 10px", borderRadius: 6, border: "1px solid #2d3748",
-                      background: isHidden ? "transparent" : "rgba(255,255,255,0.04)",
-                      cursor: "pointer", fontSize: 12, color: isHidden ? "#4b5563" : "#d1d5db",
+                      padding: "4px 10px", borderRadius: 6, border: "1px solid #d4b898",
+                      background: isHidden ? "transparent" : "rgba(69,2,6,0.08)",
+                      cursor: "pointer", fontSize: 13, color: isHidden ? "#9a7060" : "#2a0a08",
                       opacity: isHidden ? 0.5 : 1, transition: "all 0.15s"
                     }}
                   >
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: isHidden ? "#4b5563" : color, display: "inline-block" }} />
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: isHidden ? "#707070" : color, display: "inline-block" }} />
                     {name}
                   </button>
                 );
               })}
             </div>
             {regulars.length < allPlayerNames.length && (
-              <div style={{ fontSize: 11, color: "#4b5563", marginTop: 8 }}>
+              <div style={{ fontSize: 11, color: "#707070", marginTop: 8 }}>
                 Showing {regulars.length} regulars (2+ sessions). {allPlayerNames.length - regulars.length} one-time player{allPlayerNames.length - regulars.length > 1 ? "s" : ""} hidden.
               </div>
             )}
@@ -870,13 +957,13 @@ function AnalyticsView({ sessions, isAdmin, isSuperAdmin, onExport }) {
             </div>
             {detailedStats.map((st, i) => (
               <div key={st.name} style={S.tableRow}>
-                <span style={{ flex: 1.8, fontWeight: 600, color: "#e5e7eb" }}>{i === 0 && "👑 "}{st.name}</span>
-                <span style={{ flex: 0.7, textAlign: "right", color: "#9ca3af" }}>{st.sessions}</span>
-                <span style={{ flex: 0.8, textAlign: "right", color: "#9ca3af" }}>{Math.round(st.wins / st.sessions * 100)}%</span>
+                <span style={{ flex: 1.8, fontWeight: 600, color: "#2a0a08" }}>{i === 0 && "👑 "}{st.name}</span>
+                <span style={{ flex: 0.7, textAlign: "right", color: "#2a0a08" }}>{st.sessions}</span>
+                <span style={{ flex: 0.8, textAlign: "right", color: "#2a0a08" }}>{Math.round(st.wins / st.sessions * 100)}%</span>
                 <span style={{ flex: 1.2, textAlign: "right", fontWeight: 700, color: profitColor(st.totalProfit) }}>{fmt(st.totalProfit)}</span>
                 <span style={{ flex: 1, textAlign: "right", color: profitColor(st.totalProfit / st.sessions) }}>{fmt(Math.round(st.totalProfit / st.sessions * 100) / 100)}</span>
-                <span style={{ flex: 1, textAlign: "right", color: "#4ade80" }}>{st.biggestWin > 0 ? fmt(st.biggestWin) : "—"}</span>
-                <span style={{ flex: 1, textAlign: "right", color: "#f87171" }}>{st.biggestLoss < 0 ? fmt(st.biggestLoss) : "—"}</span>
+                <span style={{ flex: 1, textAlign: "right", color: "#2a0a08" }}>{st.biggestWin > 0 ? fmt(st.biggestWin) : "—"}</span>
+                <span style={{ flex: 1, textAlign: "right", color: "#c0392b" }}>{st.biggestLoss < 0 ? fmt(st.biggestLoss) : "—"}</span>
               </div>
             ))}
           </div>
@@ -919,13 +1006,13 @@ function PlayerSearchView({ sessions }) {
         value={query}
         onChange={e => setQuery(e.target.value)}
       />
-      {filtered.length === 0 && <div style={S.empty}><p style={{ color: "#6b7280" }}>No players found</p></div>}
+      {filtered.length === 0 && <div style={S.empty}><p style={{ color: "#707070" }}>No players found</p></div>}
       <div style={S.section}>
         {filtered.map(name => (
           <div key={name} style={{ ...S.card, cursor: "pointer" }} onClick={() => setSelected(name)}>
             <div style={S.cardHeader}>
               <span style={S.cardTitle}>{name}</span>
-              <ChevronIcon dir="right" color="#6b7280" size={16} />
+              <ChevronIcon dir="right" color="#707070" size={16} />
             </div>
           </div>
         ))}
@@ -986,8 +1073,8 @@ function PlayerProfile({ name, sessions, onBack }) {
     if (!active || !payload?.length) return null;
     const point = payload[0]?.payload;
     return (
-      <div style={{ background: "#1a1f2b", border: "1px solid #2d3748", borderRadius: 8, padding: "10px 14px", fontSize: 12 }}>
-        <div style={{ fontWeight: 700, color: "#e5e7eb", marginBottom: 4 }}>{point?.fullLabel || point?.label}</div>
+      <div style={{ background: "#f0e0c4", border: "1px solid #d4b898", borderRadius: 8, padding: "10px 14px", fontSize: 12 }}>
+        <div style={{ fontWeight: 700, color: "#2a0a08", marginBottom: 4 }}>{point?.fullLabel || point?.label}</div>
         <div style={{ color: profitColor(payload[0].value), fontWeight: 600 }}>{fmt(payload[0].value)}</div>
       </div>
     );
@@ -997,7 +1084,7 @@ function PlayerProfile({ name, sessions, onBack }) {
     <div style={S.content}>
       <button onClick={onBack} style={{ ...S.actionBtnAlt, marginBottom: 16, display: "inline-flex" }}><ChevronIcon dir="left" size={14}/> All Players</button>
       <h2 style={{ ...S.sessionName, marginBottom: 4 }}>{name}</h2>
-      <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>{playerSessions.length} session{playerSessions.length !== 1 ? "s" : ""}</div>
+      <div style={{ fontSize: 13, color: "#707070", marginBottom: 16 }}>{playerSessions.length} session{playerSessions.length !== 1 ? "s" : ""}</div>
 
       {stats && (
         <>
@@ -1006,21 +1093,21 @@ function PlayerProfile({ name, sessions, onBack }) {
             <StatBox label="Sessions" value={stats.sessions} />
             <StatBox label="Win Rate" value={`${stats.winRate}%`} />
             <StatBox label="Avg / Session" value={fmt(Math.round(stats.avg * 100) / 100)} color={profitColor(stats.avg)} />
-            <StatBox label="Best Win" value={stats.best > 0 ? fmt(stats.best) : "—"} color="#4ade80" />
+            <StatBox label="Best Win" value={stats.best > 0 ? fmt(stats.best) : "—"} color="#ffffff" />
             <StatBox label="Worst Loss" value={stats.worst < 0 ? fmt(stats.worst) : "—"} color="#f87171" />
           </div>
 
           {chartData.length > 2 && (
             <div style={{ ...S.chartCard, marginBottom: 24 }}>
-              <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>Cumulative winnings</div>
+              <div style={{ fontSize: 12, color: "#707070", marginBottom: 10 }}>Cumulative winnings</div>
               <div style={{ width: "100%", height: 200 }}>
                 <ResponsiveContainer>
                   <LineChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                    <XAxis dataKey="label" tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={{ stroke: "#1f2937" }} tickLine={false} />
-                    <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={{ stroke: "#1f2937" }} tickLine={false} tickFormatter={v => v === 0 ? "0" : fmt(v)} />
+                    <XAxis dataKey="label" tick={{ fill: "#707070", fontSize: 11 }} axisLine={{ stroke: "#3d1515" }} tickLine={false} />
+                    <YAxis tick={{ fill: "#707070", fontSize: 11 }} axisLine={{ stroke: "#3d1515" }} tickLine={false} tickFormatter={v => v === 0 ? "0" : fmt(v)} />
                     <Tooltip content={<CustomTooltip />} />
-                    <ReferenceLine y={0} stroke="#374151" strokeDasharray="3 3" />
-                    <Line type="linear" dataKey="value" stroke="#4ade80" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                    <ReferenceLine y={0} stroke="#3d1515" strokeDasharray="3 3" />
+                    <Line type="linear" dataKey="value" stroke="#c9a84c" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -1041,12 +1128,12 @@ function PlayerProfile({ name, sessions, onBack }) {
           {[...playerSessions].reverse().map((s, i) => (
             <div key={i} style={S.tableRow}>
               <span style={{ flex: 2 }}>
-                <div style={{ fontWeight: 600, color: "#e5e7eb", fontSize: 13 }}>{s.sessionName}</div>
-                <div style={{ color: "#6b7280", fontSize: 11 }}>{new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</div>
+                <div style={{ fontWeight: 600, color: "#2a0a08", fontSize: 13 }}>{s.sessionName}</div>
+                <div style={{ color: "#7a5030", fontSize: 11 }}>{new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</div>
               </span>
-              <span style={{ flex: 1.2, textAlign: "right", color: "#9ca3af" }}>{fmtMoney(s.buyin)}</span>
-              <span style={{ flex: 1.2, textAlign: "right", color: "#9ca3af" }}>{s.cashout !== null ? fmtMoney(s.cashout) : "—"}</span>
-              <span style={{ flex: 1.2, textAlign: "right", fontWeight: 700, color: s.profit !== null ? profitColor(s.profit) : "#4b5563" }}>{s.profit !== null ? fmt(s.profit) : "—"}</span>
+              <span style={{ flex: 1.2, textAlign: "right", color: "#2a0a08" }}>{fmtMoney(s.buyin)}</span>
+              <span style={{ flex: 1.2, textAlign: "right", color: "#2a0a08" }}>{s.cashout !== null ? fmtMoney(s.cashout) : "—"}</span>
+              <span style={{ flex: 1.2, textAlign: "right", fontWeight: 700, color: s.profit !== null ? profitColor(s.profit) : "#707070" }}>{s.profit !== null ? fmt(s.profit) : "—"}</span>
             </div>
           ))}
         </div>
@@ -1070,7 +1157,8 @@ function Modal({ modal, setModal, activeSession, updateSession, startNewSession,
   const handleNewSession = () => { startNewSession(val.trim() || undefined); close(); };
 
   const handleAddPlayer = () => {
-    const name = val.trim();
+    const raw = val.trim();
+    const name = raw.replace(/\b\w/g, c => c.toUpperCase());
     const amount = parseFloat(val2);
     if (!name) return;
     updateSession(activeId, s => {
@@ -1078,7 +1166,7 @@ function Modal({ modal, setModal, activeSession, updateSession, startNewSession,
       s.players.push({ id: uid(), name, buyins: amount > 0 ? [amount] : [], cashout: null });
       return s;
     });
-    setVal(""); setVal2(""); inputRef.current?.focus();
+    setVal(""); setVal2("20"); inputRef.current?.focus();
   };
 
   const handleBuyin = () => {
@@ -1154,72 +1242,74 @@ function Modal({ modal, setModal, activeSession, updateSession, startNewSession,
 }
 
 // ─── Styles ───
+const F = "'Oswald', sans-serif";
+const FB = "'Cormorant Garamond', Georgia, serif";
 const S = {
-  app: { fontFamily: "'SF Pro Display', 'Segoe UI', -apple-system, sans-serif", background: "#0c0f14", color: "#d1d5db", minHeight: "100vh", maxWidth: 600, margin: "0 auto", paddingBottom: 40 },
+  app: { fontFamily: FB, background: "#fbf0df", color: "#2a0a08", minHeight: "100vh", maxWidth: 600, margin: "0 auto", paddingBottom: 40 },
   loading: { display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" },
-  spinner: { width: 32, height: 32, border: "3px solid #1f2937", borderTopColor: "#4ade80", borderRadius: "50%", animation: "spin 0.8s linear infinite" },
-  header: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", borderBottom: "1px solid #1a1f2b", position: "sticky", top: 0, background: "#0c0f14", zIndex: 100 },
+  spinner: { width: 32, height: 32, border: "3px solid #d4b898", borderTopColor: "#450206", borderRadius: "50%", animation: "spin 0.8s linear infinite" },
+  header: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", borderBottom: "1px solid #5a1010", position: "sticky", top: 0, background: "#450206", zIndex: 100 },
   headerLeft: { display: "flex", alignItems: "center", gap: 8 },
-  logo: { fontSize: 24, color: "#4ade80", fontWeight: 800 },
-  title: { fontSize: 17, fontWeight: 700, color: "#e5e7eb", letterSpacing: "-0.3px" },
+  logo: { fontSize: 24, color: "#fbf0df", fontWeight: 900 },
+  title: { fontSize: 17, fontWeight: 700, color: "#ffffff", letterSpacing: "2px", textTransform: "uppercase", fontFamily: FB },
   nav: { display: "flex", gap: 2 },
-  navBtn: { background: "none", border: "none", color: "#6b7280", padding: "6px 10px", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer" },
-  navBtnActive: { background: "#1a2332", color: "#4ade80" },
+  navBtn: { background: "none", border: "none", color: "rgba(251,240,223,0.6)", padding: "6px 10px", borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: "pointer", letterSpacing: "1px", textTransform: "uppercase", fontFamily: F },
+  navBtnActive: { background: "rgba(0,0,0,0.2)", color: "#ffffff" },
   content: { padding: "16px" },
   section: { marginTop: 24 },
-  sectionTitle: { fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1, margin: 0, marginBottom: 10 },
-  newBtn: { width: "100%", padding: "14px", background: "linear-gradient(135deg, #166534, #15803d)", color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 },
-  card: { background: "#141820", border: "1px solid #1f2937", borderRadius: 12, padding: "14px 16px", marginBottom: 8, cursor: "pointer" },
+  sectionTitle: { fontSize: 10, fontWeight: 700, color: "#450206", textTransform: "uppercase", letterSpacing: 2.5, margin: 0, marginBottom: 12, fontFamily: F },
+  newBtn: { width: "100%", padding: "15px", background: "#450206", color: "#ffffff", border: "none", borderRadius: 24, fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, letterSpacing: "2px", textTransform: "uppercase", fontFamily: F },
+  card: { background: "#f0e0c4", border: "1px solid #d4b898", borderRadius: 10, padding: "14px 16px", marginBottom: 8, cursor: "pointer" },
   cardHeader: { display: "flex", justifyContent: "space-between", alignItems: "center" },
-  cardTitle: { fontSize: 15, fontWeight: 600, color: "#e5e7eb" },
-  cardSub: { fontSize: 12, color: "#6b7280", marginTop: 2 },
-  cardPot: { fontSize: 15, fontWeight: 700, color: "#4ade80" },
-  liveBadge: { background: "#dc2626", color: "#fff", fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4, letterSpacing: 0.5 },
+  cardTitle: { fontSize: 16, fontWeight: 600, color: "#2a0a08", letterSpacing: "0.5px" },
+  cardSub: { fontSize: 13, color: "#5c3020", marginTop: 2, letterSpacing: "0.5px" },
+  cardPot: { fontSize: 15, fontWeight: 700, color: "#450206" },
+  liveBadge: { background: "rgba(69,2,6,0.12)", color: "#450206", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 3, letterSpacing: 1.5, border: "1px solid rgba(69,2,6,0.3)", textTransform: "uppercase", fontFamily: F },
   sessionHeader: { marginBottom: 16 },
-  sessionName: { fontSize: 22, fontWeight: 700, color: "#e5e7eb", margin: 0 },
-  sessionMeta: { fontSize: 13, color: "#6b7280", marginTop: 4 },
+  sessionName: { fontSize: 24, fontWeight: 700, color: "#2a0a08", margin: 0, letterSpacing: "1px" },
+  sessionMeta: { fontSize: 11, color: "#7a5030", marginTop: 4, letterSpacing: "0.5px" },
   statsRow: { display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" },
-  statBox: { flex: 1, background: "#141820", border: "1px solid #1f2937", borderRadius: 10, padding: "12px 14px", minWidth: 90 },
-  statLabel: { fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.8 },
-  statValue: { fontSize: 20, fontWeight: 700, color: "#e5e7eb", marginTop: 4 },
+  statBox: { flex: 1, background: "#f0e0c4", border: "1px solid #d4b898", borderRadius: 10, padding: "12px 14px", minWidth: 90 },
+  statLabel: { fontSize: 9, color: "#7a5030", textTransform: "uppercase", letterSpacing: 1.5, fontFamily: F },
+  statValue: { fontSize: 24, fontWeight: 700, color: "#2a0a08", marginTop: 4 },
   actions: { display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" },
-  actionBtn: { padding: "10px 14px", background: "#166534", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 },
-  actionBtnAlt: { padding: "10px 14px", background: "#1a2332", color: "#d1d5db", border: "1px solid #1f2937", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 },
-  table: { background: "#141820", border: "1px solid #1f2937", borderRadius: 12, overflow: "hidden" },
-  tableHead: { display: "flex", padding: "10px 14px", fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.8, borderBottom: "1px solid #1f2937" },
-  tableRow: { display: "flex", padding: "11px 14px", alignItems: "center", borderBottom: "1px solid rgba(31,41,55,0.5)", fontSize: 13 },
-  tableTotal: { display: "flex", padding: "11px 14px", alignItems: "center", fontSize: 13, color: "#e5e7eb", background: "rgba(31,41,55,0.3)" },
+  actionBtn: { padding: "10px 16px", background: "#450206", color: "#ffffff", border: "none", borderRadius: 24, fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, letterSpacing: "1.5px", textTransform: "uppercase", fontFamily: F },
+  actionBtnAlt: { padding: "10px 14px", background: "#fbf0df", color: "#450206", border: "1px solid #d4b898", borderRadius: 24, fontSize: 11, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, letterSpacing: "1px", textTransform: "uppercase", fontFamily: F },
+  table: { background: "#f0e0c4", border: "1px solid #d4b898", borderRadius: 10, overflow: "hidden" },
+  tableHead: { display: "flex", padding: "10px 14px", fontSize: 9, color: "#7a5030", textTransform: "uppercase", letterSpacing: 1.5, borderBottom: "1px solid #d4b898", fontFamily: F },
+  tableRow: { display: "flex", padding: "11px 14px", alignItems: "center", borderBottom: "1px solid rgba(212,184,152,0.6)", fontSize: 15 },
+  tableTotal: { display: "flex", padding: "11px 14px", alignItems: "center", fontSize: 15, color: "#2a0a08", background: "rgba(69,2,6,0.06)" },
   tinyBtn: { background: "none", border: "none", cursor: "pointer", padding: 2, opacity: 0.6, display: "inline-flex" },
   iconBtn: { background: "none", border: "none", cursor: "pointer", padding: 4, opacity: 0.5, display: "inline-flex", borderRadius: 4 },
-  endBtn: { width: "100%", padding: "14px", background: "none", color: "#f87171", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", marginTop: 20 },
+  endBtn: { width: "100%", padding: "14px", background: "none", color: "#c0392b", border: "1px solid rgba(192,57,43,0.35)", borderRadius: 24, fontSize: 11, fontWeight: 700, cursor: "pointer", marginTop: 20, letterSpacing: "2px", textTransform: "uppercase", fontFamily: F },
   empty: { textAlign: "center", padding: "48px 20px" },
-  chartCard: { background: "#141820", border: "1px solid #1f2937", borderRadius: 12, padding: "16px 12px" },
-  exportBtn: { width: "100%", padding: "14px", background: "#1a2332", color: "#d1d5db", border: "1px solid #1f2937", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 },
-  summaryCard: { background: "linear-gradient(180deg, #111827, #0c1017)", border: "1px solid #1f2937", borderRadius: 16, overflow: "hidden" },
+  chartCard: { background: "#f0e0c4", border: "1px solid #d4b898", borderRadius: 10, padding: "16px 12px" },
+  exportBtn: { width: "100%", padding: "14px", background: "#fbf0df", color: "#450206", border: "1px solid #d4b898", borderRadius: 24, fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, letterSpacing: "1.5px", textTransform: "uppercase", fontFamily: F },
+  summaryCard: { background: "#f0e0c4", border: "1px solid #d4b898", borderRadius: 14, overflow: "hidden" },
   summaryHeader: { display: "flex", alignItems: "center", gap: 12, padding: "20px 20px 0" },
-  summaryLogo: { fontSize: 32, color: "#4ade80", fontWeight: 800 },
-  summaryTitle: { fontSize: 20, fontWeight: 700, color: "#e5e7eb", margin: 0 },
-  summarySub: { fontSize: 13, color: "#6b7280", marginTop: 2 },
+  summaryLogo: { fontSize: 32, color: "#450206", fontWeight: 900 },
+  summaryTitle: { fontSize: 22, fontWeight: 700, color: "#2a0a08", margin: 0, letterSpacing: "1px" },
+  summarySub: { fontSize: 11, color: "#7a5030", marginTop: 2, letterSpacing: "0.5px" },
   summaryStatsRow: { display: "flex", gap: 10, padding: "16px 20px", flexWrap: "wrap" },
-  summaryStatBox: { flex: 1, background: "rgba(31,41,55,0.4)", borderRadius: 10, padding: "12px", minWidth: 80, textAlign: "center" },
-  summaryStatLabel: { fontSize: 11, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1 },
-  summaryStatVal: { fontSize: 22, fontWeight: 700, color: "#e5e7eb" },
+  summaryStatBox: { flex: 1, background: "rgba(69,2,6,0.06)", border: "1px solid rgba(69,2,6,0.2)", borderRadius: 10, padding: "12px", minWidth: 80, textAlign: "center" },
+  summaryStatLabel: { fontSize: 9, color: "#7a5030", textTransform: "uppercase", letterSpacing: 1.5, fontFamily: F },
+  summaryStatVal: { fontSize: 26, fontWeight: 700, color: "#2a0a08" },
   summaryTable: { margin: "0 12px" },
-  summaryTableHead: { display: "flex", padding: "8px 10px", fontSize: 10, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1, borderBottom: "1px solid #1f2937" },
-  summaryTableRow: { display: "flex", padding: "10px 10px", alignItems: "center", fontSize: 13, borderBottom: "1px solid rgba(31,41,55,0.4)" },
-  summaryTableTotalRow: { display: "flex", padding: "10px 10px", alignItems: "center", fontSize: 13, color: "#e5e7eb", background: "rgba(31,41,55,0.3)", borderRadius: "0 0 8px 8px" },
-  summaryFooter: { textAlign: "center", padding: "14px", fontSize: 11, color: "#374151", letterSpacing: 0.5 },
-  overlay: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 20 },
-  modal: { background: "#1a1f2b", border: "1px solid #2d3748", borderRadius: 16, padding: 24, width: "100%", maxWidth: 360 },
-  modalTitle: { fontSize: 17, fontWeight: 700, color: "#e5e7eb", margin: "0 0 16px" },
-  input: { width: "100%", padding: "12px 14px", background: "#0c0f14", border: "1px solid #2d3748", borderRadius: 8, color: "#e5e7eb", fontSize: 14, marginBottom: 10, outline: "none", boxSizing: "border-box" },
-  select: { width: "100%", padding: "12px 14px", background: "#0c0f14", border: "1px solid #2d3748", borderRadius: 8, color: "#e5e7eb", fontSize: 14, marginBottom: 10, outline: "none", boxSizing: "border-box" },
-  modalBtn: { width: "100%", padding: "12px", background: "#166534", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" },
-  modalBtnAlt: { width: "100%", padding: "12px", background: "#1f2937", color: "#d1d5db", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer" },
+  summaryTableHead: { display: "flex", padding: "8px 10px", fontSize: 9, color: "#7a5030", textTransform: "uppercase", letterSpacing: 1.5, borderBottom: "1px solid #d4b898", fontFamily: F },
+  summaryTableRow: { display: "flex", padding: "10px 10px", alignItems: "center", fontSize: 15, borderBottom: "1px solid rgba(212,184,152,0.5)" },
+  summaryTableTotalRow: { display: "flex", padding: "10px 10px", alignItems: "center", fontSize: 15, color: "#2a0a08", background: "rgba(69,2,6,0.06)", borderRadius: "0 0 8px 8px" },
+  summaryFooter: { textAlign: "center", padding: "14px", fontSize: 9, color: "#c0a080", letterSpacing: 1.5, textTransform: "uppercase", fontFamily: F },
+  overlay: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(42,10,8,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 20 },
+  modal: { background: "#f5e6cc", border: "1px solid #d4b898", borderRadius: 14, padding: 24, width: "100%", maxWidth: 360 },
+  modalTitle: { fontSize: 14, fontWeight: 700, color: "#2a0a08", margin: "0 0 16px", letterSpacing: "1.5px", textTransform: "uppercase", fontFamily: F },
+  input: { width: "100%", padding: "12px 14px", background: "#fbf0df", border: "1px solid #d4b898", borderRadius: 8, color: "#2a0a08", fontSize: 16, marginBottom: 10, outline: "none", boxSizing: "border-box" },
+  select: { width: "100%", padding: "12px 14px", background: "#fbf0df", border: "1px solid #d4b898", borderRadius: 8, color: "#2a0a08", fontSize: 16, marginBottom: 10, outline: "none", boxSizing: "border-box" },
+  modalBtn: { width: "100%", padding: "12px", background: "#450206", color: "#ffffff", border: "none", borderRadius: 24, fontSize: 12, fontWeight: 700, cursor: "pointer", letterSpacing: "2px", textTransform: "uppercase", fontFamily: F },
+  modalBtnAlt: { width: "100%", padding: "12px", background: "#fbf0df", color: "#450206", border: "1px solid #d4b898", borderRadius: 24, fontSize: 12, fontWeight: 600, cursor: "pointer", letterSpacing: "1px", textTransform: "uppercase", fontFamily: F },
 };
 
 if (typeof document !== "undefined") {
   const el = document.createElement("style");
-  el.textContent = `@keyframes spin{to{transform:rotate(360deg)}} *{box-sizing:border-box} body{margin:0;background:#0c0f14} .recharts-surface{overflow:visible}`;
+  el.textContent = `@keyframes spin{to{transform:rotate(360deg)}} *{box-sizing:border-box} body{margin:0;background:#fbf0df} .recharts-surface{overflow:visible}`;
   document.head.appendChild(el);
 }

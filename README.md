@@ -210,6 +210,31 @@ Without `.env.local`, the app falls back to `localStorage` automatically — use
 
 ---
 
+## UI design
+
+Inspired by the Venetian Las Vegas Poker Room aesthetic.
+
+| Element | Choice |
+|---|---|
+| Body / display font | Cormorant Garamond (serif) — closest free substitute for Venetian's licensed "Romie" typeface |
+| Labels / buttons / nav | Oswald (geometric sans-serif) — substitute for Venetian's "brother-1816" |
+| Primary color | `#450206` deep burgundy |
+| Background | `#fbf0df` warm cream |
+| Card background | `#f0e0c4` |
+| Accent / destructive text | `#c0392b` |
+
+All inputs are set to `font-size: 16px` to prevent iOS Safari from auto-zooming when the keyboard opens.
+
+---
+
+## Data safety
+
+- **Load failure protection** — if Supabase fails to load on startup, the app shows empty data but does **not** save that empty state back. A failed load can never overwrite existing data in Supabase.
+- **Backup regularly** — use the "Backup All Sessions (JSON)" button in Stats (admin role). Store the file somewhere safe. There is no automated backup.
+- **Restore** — if data is lost, open Supabase → Table Editor → `poker_data` row → paste your backup JSON into the `value` column and save.
+
+---
+
 ## Known limitations
 
 - **Single shared dataset** — all users with a password see and modify the same data. Not suitable if you need per-user isolation.
