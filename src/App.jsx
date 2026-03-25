@@ -3,6 +3,18 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceL
 import { supabase } from "./lib/supabase";
 
 const STORAGE_KEY = "poker-sessions-v2";
+const SUPER_ADMIN_HASH = import.meta.env.VITE_APP_SUPER_ADMIN_HASH || "";
+const ADMIN_HASH = import.meta.env.VITE_APP_ADMIN_HASH || "";
+const VIEW_HASH  = import.meta.env.VITE_APP_VIEW_HASH  || "";
+const SESSION_KEY = "poker-unlocked";
+const LOCKOUT_KEY = "poker-lockout";
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
 
 // ─── Helpers ───
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -55,28 +67,15 @@ async function saveSessions(sessions) {
   }
 }
 
-// ─── CSV Export ───
-function exportCSV(sessions) {
-  const ended = sessions.filter(s => s.ended).sort((a, b) => new Date(a.date) - new Date(b.date));
-  if (ended.length === 0) return;
-  const rows = [["Session", "Date", "Player", "Buy-in", "Buy-in Breakdown", "Cash Out", "Profit"]];
-  ended.forEach(s => {
-    const d = new Date(s.date).toLocaleDateString();
-    s.players.forEach(p => {
-      const buyin = p.buyins.reduce((a, x) => a + x, 0);
-      const breakdown = p.buyins.join(" + ");
-      const co = p.cashout !== null ? p.cashout : "";
-      const profit = p.cashout !== null ? p.cashout - buyin : "";
-      rows.push([s.name, d, p.name, buyin, breakdown, co, profit]);
-    });
-  });
-  const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
+// ─── Export / Restore ───
+function exportJSON(sessions) {
+  const blob = new Blob([JSON.stringify(sessions, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = `poker_sessions_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.href = url; a.download = `poker_backup_${new Date().toISOString().slice(0, 10)}.json`;
   a.click(); URL.revokeObjectURL(url);
 }
+
 
 // ─── Icons ───
 const Icon = ({ d, size = 18, color = "currentColor" }) => (
@@ -88,6 +87,105 @@ const ChevronIcon = ({ dir = "right", ...p }) => {
   const ds = { right: "M9 18l6-6-6-6", left: "M15 18l-6-6 6-6", down: "M6 9l6 6 6-6" };
   return <Icon d={ds[dir]} {...p}/>;
 };
+
+// ─── Pin Gate ───
+function PinGate({ children }) {
+  const [role, setRole] = useState(() => sessionStorage.getItem(SESSION_KEY) || null); // "admin" | "view" | null
+  const [input, setInput] = useState("");
+  const [error, setError] = useState("");
+  const [attempts, setAttempts] = useState(() => {
+    const d = JSON.parse(localStorage.getItem(LOCKOUT_KEY) || "{}");
+    if (d.until && Date.now() < d.until) return MAX_ATTEMPTS;
+    if (d.until && Date.now() >= d.until) { localStorage.removeItem(LOCKOUT_KEY); }
+    return d.attempts || 0;
+  });
+  const [lockedUntil, setLockedUntil] = useState(() => {
+    const d = JSON.parse(localStorage.getItem(LOCKOUT_KEY) || "{}");
+    return d.until && Date.now() < d.until ? d.until : null;
+  });
+
+  useEffect(() => {
+    if (!lockedUntil) return;
+    const id = setInterval(() => {
+      if (Date.now() >= lockedUntil) {
+        setLockedUntil(null);
+        setAttempts(0);
+        localStorage.removeItem(LOCKOUT_KEY);
+        clearInterval(id);
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [lockedUntil]);
+
+  const submit = async () => {
+    if (lockedUntil) return;
+    const hash = await sha256(input);
+    if (SUPER_ADMIN_HASH && hash === SUPER_ADMIN_HASH) {
+      sessionStorage.setItem(SESSION_KEY, "superadmin");
+      localStorage.removeItem(LOCKOUT_KEY);
+      setRole("superadmin");
+    } else if (hash === ADMIN_HASH) {
+      sessionStorage.setItem(SESSION_KEY, "admin");
+      localStorage.removeItem(LOCKOUT_KEY);
+      setRole("admin");
+    } else if (hash === VIEW_HASH) {
+      sessionStorage.setItem(SESSION_KEY, "view");
+      localStorage.removeItem(LOCKOUT_KEY);
+      setRole("view");
+    } else {
+      const newAttempts = attempts + 1;
+      setInput("");
+      if (newAttempts >= MAX_ATTEMPTS) {
+        const until = Date.now() + LOCKOUT_MS;
+        localStorage.setItem(LOCKOUT_KEY, JSON.stringify({ attempts: newAttempts, until }));
+        setLockedUntil(until);
+        setError(`Too many attempts. Locked for 15 minutes.`);
+      } else {
+        localStorage.setItem(LOCKOUT_KEY, JSON.stringify({ attempts: newAttempts }));
+        setAttempts(newAttempts);
+        setError(`Incorrect password. ${MAX_ATTEMPTS - newAttempts} attempt${MAX_ATTEMPTS - newAttempts !== 1 ? "s" : ""} remaining.`);
+        setTimeout(() => setError(""), 2000);
+      }
+    }
+  };
+
+  if (role) return children(role !== "view", role === "superadmin");
+
+  const remaining = lockedUntil ? Math.ceil((lockedUntil - Date.now()) / 1000) : null;
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#0c0f14" }}>
+      <div style={{ background: "#141820", border: "1px solid #1f2937", borderRadius: 20, padding: "40px 32px", width: "100%", maxWidth: 320, textAlign: "center" }}>
+        <div style={{ fontSize: 40, marginBottom: 8 }}>♠</div>
+        <div style={{ fontSize: 20, fontWeight: 700, color: "#e5e7eb", marginBottom: 4 }}>Poker Tracker</div>
+        <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 28 }}>Enter password to continue</div>
+        <input
+          autoFocus
+          type="password"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && submit()}
+          disabled={!!lockedUntil}
+          placeholder="Password"
+          style={{
+            width: "100%", padding: "14px", fontSize: 15,
+            background: "#0c0f14", border: `1px solid ${error ? "#f87171" : "#2d3748"}`,
+            borderRadius: 10, color: "#e5e7eb", outline: "none", boxSizing: "border-box",
+            marginBottom: 12, transition: "border-color 0.2s", opacity: lockedUntil ? 0.4 : 1
+          }}
+        />
+        {error && <div style={{ color: "#f87171", fontSize: 12, marginBottom: 10, lineHeight: 1.4 }}>{error}{remaining ? ` (${remaining}s)` : ""}</div>}
+        <button
+          onClick={submit}
+          disabled={!!lockedUntil || !input}
+          style={{ width: "100%", padding: "13px", background: lockedUntil ? "#1f2937" : "#166534", color: lockedUntil ? "#4b5563" : "#fff", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: lockedUntil ? "not-allowed" : "pointer" }}
+        >
+          {lockedUntil ? `Locked (${remaining}s)` : "Unlock"}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ─── Main App ───
 export default function PokerTracker() {
@@ -133,23 +231,28 @@ export default function PokerTracker() {
     setView("active");
   };
 
-  if (!loaded) return <div style={S.loading}><div style={S.spinner}/></div>;
+  if (!loaded) return <PinGate>{() => <div style={S.loading}><div style={S.spinner}/></div>}</PinGate>;
 
   return (
-    <div style={S.app}>
-      <Header view={view} setView={setView} activeId={activeId} hasEnded={sessions.some(s => s.ended)} />
-      {view === "home" && <HomeView sessions={sessions} onNew={() => setModal({ type: "newSession" })} onOpen={(id) => { const s = sessions.find(x=>x.id===id); if(s.ended){ setSummaryId(id); setView("summary"); } else { setActiveId(id); setView("active"); }}} onDelete={deleteSession} />}
-      {view === "active" && activeSession && <ActiveView session={activeSession} updateSession={updateSession} setModal={setModal} onEnd={() => endSession(activeId)} />}
-      {view === "summary" && summarySession && <SummaryView session={summarySession} onResume={() => resumeSession(summaryId)} onBack={() => setView("home")} />}
-      {view === "history" && <HistoryView sessions={sessions} onOpen={(id) => { setSummaryId(id); setView("summary"); }} onDelete={deleteSession} />}
-      {view === "analytics" && <AnalyticsView sessions={sessions} onExport={() => exportCSV(sessions)} />}
-      {modal && <Modal modal={modal} setModal={setModal} sessions={sessions} activeSession={activeSession} updateSession={updateSession} startNewSession={startNewSession} activeId={activeId} />}
-    </div>
+    <PinGate>
+      {(isAdmin, isSuperAdmin) => (
+        <div style={S.app}>
+          <Header view={view} setView={setView} activeId={activeId} hasEnded={sessions.some(s => s.ended)} isSuperAdmin={isSuperAdmin} />
+          {view === "home" && <HomeView sessions={sessions} isAdmin={isAdmin} onNew={() => setModal({ type: "newSession" })} onOpen={(id) => { const s = sessions.find(x=>x.id===id); if(s.ended){ setSummaryId(id); setView("summary"); } else { setActiveId(id); setView("active"); }}} onDelete={deleteSession} />}
+          {view === "active" && activeSession && <ActiveView session={activeSession} isAdmin={isAdmin} updateSession={updateSession} setModal={setModal} onEnd={() => endSession(activeId)} />}
+          {view === "summary" && summarySession && <SummaryView session={summarySession} isAdmin={isAdmin} onResume={() => resumeSession(summaryId)} onBack={() => setView("home")} />}
+          {view === "history" && isSuperAdmin && <HistoryView sessions={sessions} isAdmin={isAdmin} onOpen={(id) => { setSummaryId(id); setView("summary"); }} onDelete={deleteSession} />}
+          {view === "players" && isSuperAdmin && <PlayerSearchView sessions={sessions} />}
+          {view === "analytics" && <AnalyticsView sessions={sessions} isAdmin={isAdmin} isSuperAdmin={isSuperAdmin} onExport={() => exportJSON(sessions)} />}
+          {isAdmin && modal && <Modal modal={modal} setModal={setModal} sessions={sessions} activeSession={activeSession} updateSession={updateSession} startNewSession={startNewSession} activeId={activeId} />}
+        </div>
+      )}
+    </PinGate>
   );
 }
 
 // ─── Header ───
-function Header({ view, setView, activeId, hasEnded }) {
+function Header({ view, setView, activeId, hasEnded, isSuperAdmin }) {
   return (
     <div style={S.header}>
       <div style={S.headerLeft}>
@@ -159,7 +262,8 @@ function Header({ view, setView, activeId, hasEnded }) {
       <div style={S.nav}>
         <NavBtn label="Home" active={view === "home"} onClick={() => setView("home")} />
         {activeId && <NavBtn label="Session" active={view === "active"} onClick={() => setView("active")} />}
-        <NavBtn label="History" active={view === "history"} onClick={() => setView("history")} />
+        {isSuperAdmin && <NavBtn label="History" active={view === "history"} onClick={() => setView("history")} />}
+        {isSuperAdmin && <NavBtn label="Players" active={view === "players"} onClick={() => setView("players")} />}
         {hasEnded && <NavBtn label="Stats" active={view === "analytics"} onClick={() => setView("analytics")} />}
       </div>
     </div>
@@ -171,22 +275,22 @@ function NavBtn({ label, active, onClick }) {
 }
 
 // ─── Home View ───
-function HomeView({ sessions, onNew, onOpen, onDelete }) {
+function HomeView({ sessions, isAdmin, onNew, onOpen, onDelete }) {
   const activeSessions = sessions.filter(s => !s.ended);
   const recentEnded = sessions.filter(s => s.ended).slice(0, 3);
   return (
     <div style={S.content}>
-      <button onClick={onNew} style={S.newBtn}><PlusIcon size={20}/> New Session</button>
+      {isAdmin && <button onClick={onNew} style={S.newBtn}><PlusIcon size={20}/> New Session</button>}
       {activeSessions.length > 0 && (
         <div style={S.section}>
           <h3 style={S.sectionTitle}>Active Sessions</h3>
-          {activeSessions.map(s => <SessionCard key={s.id} session={s} onClick={() => onOpen(s.id)} onDelete={() => onDelete(s.id)} />)}
+          {activeSessions.map(s => <SessionCard key={s.id} session={s} isAdmin={isAdmin} onClick={() => onOpen(s.id)} onDelete={() => onDelete(s.id)} />)}
         </div>
       )}
       {recentEnded.length > 0 && (
         <div style={S.section}>
           <h3 style={S.sectionTitle}>Recent</h3>
-          {recentEnded.map(s => <SessionCard key={s.id} session={s} onClick={() => onOpen(s.id)} onDelete={() => onDelete(s.id)} />)}
+          {recentEnded.map(s => <SessionCard key={s.id} session={s} isAdmin={isAdmin} onClick={() => onOpen(s.id)} onDelete={() => onDelete(s.id)} />)}
         </div>
       )}
       {sessions.length === 0 && (
@@ -199,7 +303,7 @@ function HomeView({ sessions, onNew, onOpen, onDelete }) {
   );
 }
 
-function SessionCard({ session, onClick, onDelete }) {
+function SessionCard({ session, onClick, onDelete, isAdmin }) {
   const d = new Date(session.date);
   const dateStr = d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
   const playerCount = session.players.length;
@@ -214,7 +318,7 @@ function SessionCard({ session, onClick, onDelete }) {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {!session.ended && <span style={S.liveBadge}>LIVE</span>}
           <span style={S.cardPot}>{fmtMoney(totalPot)}</span>
-          <button onClick={e => { e.stopPropagation(); onDelete(); }} style={S.iconBtn}><TrashIcon size={14} color="#6b7280"/></button>
+          {isAdmin && <button onClick={e => { e.stopPropagation(); onDelete(); }} style={S.iconBtn}><TrashIcon size={14} color="#6b7280"/></button>}
         </div>
       </div>
     </div>
@@ -222,7 +326,7 @@ function SessionCard({ session, onClick, onDelete }) {
 }
 
 // ─── Active Session View ───
-function ActiveView({ session, updateSession, setModal, onEnd }) {
+function ActiveView({ session, isAdmin, updateSession, setModal, onEnd }) {
   const totalBuyins = session.players.reduce((a, p) => a + p.buyins.reduce((b, x) => b + x, 0), 0);
   const totalCashouts = session.players.filter(p => p.cashout !== null).reduce((a, p) => a + p.cashout, 0);
   const cashedOutCount = session.players.filter(p => p.cashout !== null).length;
@@ -255,9 +359,9 @@ function ActiveView({ session, updateSession, setModal, onEnd }) {
       </div>
 
       <div style={S.actions}>
-        <button onClick={() => setModal({ type: "addPlayer" })} style={S.actionBtn}><PlusIcon size={16}/> Add Player</button>
-        <button onClick={() => setModal({ type: "buyin" })} style={S.actionBtnAlt}>Buy-in / Rebuy</button>
-        <button onClick={() => setModal({ type: "cashout" })} style={S.actionBtnAlt}>Cash Out</button>
+        {isAdmin && <button onClick={() => setModal({ type: "addPlayer" })} style={S.actionBtn}><PlusIcon size={16}/> Add Player</button>}
+        {isAdmin && <button onClick={() => setModal({ type: "buyin" })} style={S.actionBtnAlt}>Buy-in / Rebuy</button>}
+        {isAdmin && <button onClick={() => setModal({ type: "cashout" })} style={S.actionBtnAlt}>Cash Out</button>}
       </div>
 
       {session.players.length > 0 ? (
@@ -281,13 +385,13 @@ function ActiveView({ session, updateSession, setModal, onEnd }) {
                 </span>
                 <span style={{ flex: 1.5, textAlign: "right", color: p.cashout !== null ? "#d1d5db" : "#4b5563" }}>
                   {p.cashout !== null ? fmtMoney(p.cashout) : "—"}
-                  {p.cashout !== null && <button onClick={() => undoCashout(p.id)} style={{ ...S.tinyBtn, marginLeft: 4 }} title="Undo">↩</button>}
+                  {isAdmin && p.cashout !== null && <button onClick={() => undoCashout(p.id)} style={{ ...S.tinyBtn, marginLeft: 4 }} title="Undo">↩</button>}
                 </span>
                 <span style={{ flex: 1.5, textAlign: "right", fontWeight: 600, color: profit !== null ? profitColor(profit) : "#4b5563" }}>
                   {profit !== null ? fmt(profit) : "—"}
                 </span>
                 <span style={{ flex: 0.5, textAlign: "right" }}>
-                  {p.cashout === null && <button onClick={() => removePlayer(p.id)} style={S.tinyBtn}><TrashIcon size={12} color="#6b7280"/></button>}
+                  {isAdmin && p.cashout === null && <button onClick={() => removePlayer(p.id)} style={S.tinyBtn}><TrashIcon size={12} color="#6b7280"/></button>}
                 </span>
               </div>
             );
@@ -304,7 +408,7 @@ function ActiveView({ session, updateSession, setModal, onEnd }) {
         <div style={S.empty}><p style={{ color: "#6b7280" }}>Add players to get started</p></div>
       )}
 
-      {session.players.length > 0 && (
+      {session.players.length > 0 && isAdmin && (
         <button onClick={onEnd} style={S.endBtn}>End Session</button>
       )}
     </div>
@@ -321,7 +425,7 @@ function StatBox({ label, value, color }) {
 }
 
 // ─── Summary View ───
-function SummaryView({ session, onResume, onBack }) {
+function SummaryView({ session, isAdmin, onResume, onBack }) {
   const sorted = [...session.players].sort((a, b) => {
     const pa = a.cashout !== null ? a.cashout - a.buyins.reduce((s, x) => s + x, 0) : -Infinity;
     const pb = b.cashout !== null ? b.cashout - b.buyins.reduce((s, x) => s + x, 0) : -Infinity;
@@ -394,14 +498,14 @@ function SummaryView({ session, onResume, onBack }) {
       </div>
       <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
         <button onClick={onBack} style={S.actionBtnAlt}><ChevronIcon dir="left" size={14}/> Home</button>
-        {session.ended && <button onClick={onResume} style={S.actionBtnAlt}>Reopen Session</button>}
+        {isAdmin && session.ended && <button onClick={onResume} style={S.actionBtnAlt}>Reopen Session</button>}
       </div>
     </div>
   );
 }
 
 // ─── History View ───
-function HistoryView({ sessions, onOpen, onDelete }) {
+function HistoryView({ sessions, isAdmin, onOpen, onDelete }) {
   const ended = sessions.filter(s => s.ended);
   if (ended.length === 0) return (
     <div style={S.content}><div style={S.empty}><p style={{ color: "#6b7280" }}>No completed sessions yet</p></div></div>
@@ -449,14 +553,162 @@ function HistoryView({ sessions, onOpen, onDelete }) {
       )}
       <div style={S.section}>
         <h3 style={S.sectionTitle}>Past Sessions</h3>
-        {ended.map(s => <SessionCard key={s.id} session={s} onClick={() => onOpen(s.id)} onDelete={() => onDelete(s.id)} />)}
+        {ended.map(s => <SessionCard key={s.id} session={s} isAdmin={isAdmin} onClick={() => onOpen(s.id)} onDelete={() => onDelete(s.id)} />)}
       </div>
     </div>
   );
 }
 
+// ─── Limited Stats View (admin + view-only) ───
+function HighlightCard({ emoji, label, value }) {
+  return (
+    <div style={{ background: "#141820", border: "1px solid #1f2937", borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+      <span style={{ fontSize: 24 }}>{emoji}</span>
+      <div>
+        <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.8 }}>{label}</div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "#e5e7eb", marginTop: 2 }}>{value}</div>
+      </div>
+    </div>
+  );
+}
+
+function LimitedStatsView({ sessions, isAdmin, onExport }) {
+  const window4 = useMemo(() =>
+    sessions.filter(s => s.ended)
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .slice(-4),
+    [sessions]
+  );
+
+  const { playerStats, allPlayerNames } = useMemo(() => {
+    const stats = {};
+    window4.forEach(s => {
+      s.players.forEach(p => {
+        if (p.cashout === null) return;
+        if (!stats[p.name]) stats[p.name] = { sessions: 0, totalProfit: 0, totalBuyin: 0, wins: 0 };
+        const buyin = p.buyins.reduce((a, x) => a + x, 0);
+        const profit = p.cashout - buyin;
+        stats[p.name].sessions++;
+        stats[p.name].totalProfit += profit;
+        stats[p.name].totalBuyin += buyin;
+        if (profit > 0) stats[p.name].wins++;
+      });
+    });
+    return { playerStats: stats, allPlayerNames: Object.keys(stats) };
+  }, [window4]);
+
+  // Per-player profits in order across the window
+  const sessionProfits = useMemo(() => {
+    const map = {};
+    allPlayerNames.forEach(name => {
+      map[name] = window4.map(s => {
+        const p = s.players.find(x => x.name === name && x.cashout !== null);
+        return p ? p.cashout - p.buyins.reduce((a, x) => a + x, 0) : null;
+      });
+    });
+    return map;
+  }, [window4, allPlayerNames]);
+
+  const highlights = useMemo(() => {
+    if (allPlayerNames.length === 0) return null;
+
+    // Hot streak: most consecutive profitable sessions
+    let hotPlayer = ""; let hotCount = 0;
+    allPlayerNames.forEach(name => {
+      const sp = sessionProfits[name].filter(x => x !== null);
+      let max = 0, cur = 0;
+      sp.forEach(p => { if (p > 0) { cur++; max = Math.max(max, cur); } else cur = 0; });
+      if (max > hotCount) { hotCount = max; hotPlayer = name; }
+    });
+
+    // Best single session win
+    let bestPlayer = ""; let bestAmount = -Infinity;
+    allPlayerNames.forEach(name => {
+      const sp = sessionProfits[name].filter(x => x !== null);
+      if (!sp.length) return;
+      const best = Math.max(...sp);
+      if (best > bestAmount) { bestAmount = best; bestPlayer = name; }
+    });
+
+    // Most consistent: lowest std dev (2+ sessions)
+    let consistentPlayer = ""; let lowestStd = Infinity;
+    allPlayerNames.forEach(name => {
+      const sp = sessionProfits[name].filter(x => x !== null);
+      if (sp.length < 2) return;
+      const mean = sp.reduce((a, b) => a + b, 0) / sp.length;
+      const std = Math.sqrt(sp.reduce((a, b) => a + (b - mean) ** 2, 0) / sp.length);
+      if (std < lowestStd) { lowestStd = std; consistentPlayer = name; }
+    });
+
+    // Buy-in monster: highest total buyin
+    let buyinPlayer = ""; let buyinTotal = 0;
+    allPlayerNames.forEach(name => {
+      if (playerStats[name].totalBuyin > buyinTotal) { buyinTotal = playerStats[name].totalBuyin; buyinPlayer = name; }
+    });
+
+    return { hotPlayer, hotCount, bestPlayer, bestAmount, consistentPlayer, buyinPlayer, buyinTotal };
+  }, [allPlayerNames, sessionProfits, playerStats]);
+
+  if (window4.length === 0) return (
+    <div style={S.content}><div style={S.empty}><p style={{ color: "#6b7280" }}>Need completed sessions for stats</p></div></div>
+  );
+
+  const detailedStats = allPlayerNames
+    .map(name => ({ name, ...playerStats[name] }))
+    .sort((a, b) => b.totalProfit - a.totalProfit);
+
+  return (
+    <div style={S.content}>
+      {highlights && (
+        <div style={S.section}>
+          <h3 style={S.sectionTitle}>Highlights · Last {window4.length} Session{window4.length !== 1 ? "s" : ""}</h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <HighlightCard emoji="🔥" label="Hot Streak" value={highlights.hotCount > 0 ? `${highlights.hotPlayer} — ${highlights.hotCount} in a row` : "—"} />
+            <HighlightCard emoji="🏆" label="Best Single Win" value={highlights.bestAmount > 0 ? `${highlights.bestPlayer} — ${fmt(highlights.bestAmount)}` : "—"} />
+            <HighlightCard emoji="🎯" label="Most Consistent" value={highlights.consistentPlayer ? highlights.consistentPlayer : "—"} />
+            <HighlightCard emoji="📅" label="Buy-in Monster" value={highlights.buyinPlayer ? `${highlights.buyinPlayer} — ${fmtMoney(highlights.buyinTotal)}` : "—"} />
+          </div>
+        </div>
+      )}
+
+      <div style={S.section}>
+        <h3 style={S.sectionTitle}>Player Stats · Last {window4.length} Session{window4.length !== 1 ? "s" : ""}</h3>
+        <div style={{ overflowX: "auto" }}>
+          <div style={{ ...S.table, minWidth: 380 }}>
+            <div style={S.tableHead}>
+              <span style={{ flex: 1.8 }}>Player</span>
+              <span style={{ flex: 0.7, textAlign: "right" }}>Sess.</span>
+              <span style={{ flex: 0.8, textAlign: "right" }}>Win %</span>
+              <span style={{ flex: 1.2, textAlign: "right" }}>Net</span>
+              <span style={{ flex: 1, textAlign: "right" }}>Avg</span>
+            </div>
+            {detailedStats.map((st, i) => (
+              <div key={st.name} style={S.tableRow}>
+                <span style={{ flex: 1.8, fontWeight: 600, color: "#e5e7eb" }}>{i === 0 && "👑 "}{st.name}</span>
+                <span style={{ flex: 0.7, textAlign: "right", color: "#9ca3af" }}>{st.sessions}</span>
+                <span style={{ flex: 0.8, textAlign: "right", color: "#9ca3af" }}>{Math.round(st.wins / st.sessions * 100)}%</span>
+                <span style={{ flex: 1.2, textAlign: "right", fontWeight: 700, color: profitColor(st.totalProfit) }}>{fmt(st.totalProfit)}</span>
+                <span style={{ flex: 1, textAlign: "right", color: profitColor(st.totalProfit / st.sessions) }}>{fmt(Math.round(st.totalProfit / st.sessions * 100) / 100)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {isAdmin && (
+        <div style={{ marginTop: 24 }}>
+          <button onClick={onExport} style={S.exportBtn}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            Backup All Sessions (JSON)
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Analytics View ───
-function AnalyticsView({ sessions, onExport }) {
+function AnalyticsView({ sessions, isAdmin, isSuperAdmin, onExport }) {
   const ended = useMemo(() => sessions.filter(s => s.ended).sort((a, b) => new Date(a.date) - new Date(b.date)), [sessions]);
   const [hiddenPlayers, setHiddenPlayers] = useState(new Set());
 
@@ -533,6 +785,8 @@ function AnalyticsView({ sessions, onExport }) {
       </div>
     );
   };
+
+  if (!isSuperAdmin) return <LimitedStatsView sessions={sessions} isAdmin={isAdmin} onExport={onExport} />;
 
   if (ended.length === 0) return (
     <div style={S.content}><div style={S.empty}><p style={{ color: "#6b7280" }}>Need completed sessions for analytics</p></div></div>
@@ -629,11 +883,173 @@ function AnalyticsView({ sessions, onExport }) {
         </div>
       </div>
 
-      <div style={{ marginTop: 24 }}>
-        <button onClick={onExport} style={S.exportBtn}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-          Export All Sessions (CSV)
-        </button>
+      {isAdmin && (
+        <div style={{ marginTop: 24 }}>
+          <button onClick={onExport} style={S.exportBtn}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            Backup All Sessions (JSON)
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Player Search View ───
+function PlayerSearchView({ sessions }) {
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState(null);
+
+  const allPlayers = useMemo(() => {
+    const names = new Set();
+    sessions.filter(s => s.ended).forEach(s => s.players.forEach(p => names.add(p.name)));
+    return [...names].sort();
+  }, [sessions]);
+
+  const filtered = allPlayers.filter(n => n.toLowerCase().includes(query.toLowerCase()));
+
+  if (selected) return <PlayerProfile name={selected} sessions={sessions} onBack={() => setSelected(null)} />;
+
+  return (
+    <div style={S.content}>
+      <input
+        autoFocus
+        style={{ ...S.input, marginBottom: 4 }}
+        placeholder="Search player..."
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+      />
+      {filtered.length === 0 && <div style={S.empty}><p style={{ color: "#6b7280" }}>No players found</p></div>}
+      <div style={S.section}>
+        {filtered.map(name => (
+          <div key={name} style={{ ...S.card, cursor: "pointer" }} onClick={() => setSelected(name)}>
+            <div style={S.cardHeader}>
+              <span style={S.cardTitle}>{name}</span>
+              <ChevronIcon dir="right" color="#6b7280" size={16} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PlayerProfile({ name, sessions, onBack }) {
+  const ended = useMemo(() =>
+    sessions.filter(s => s.ended).sort((a, b) => new Date(a.date) - new Date(b.date)),
+    [sessions]
+  );
+
+  const playerSessions = useMemo(() =>
+    ended.map(s => {
+      const p = s.players.find(x => x.name === name);
+      if (!p) return null;
+      const buyin = p.buyins.reduce((a, x) => a + x, 0);
+      const profit = p.cashout !== null ? p.cashout - buyin : null;
+      return { sessionName: s.name, date: s.date, buyin, cashout: p.cashout, profit };
+    }).filter(Boolean),
+    [ended, name]
+  );
+
+  const stats = useMemo(() => {
+    const completed = playerSessions.filter(s => s.profit !== null);
+    if (!completed.length) return null;
+    const totalProfit = completed.reduce((a, s) => a + s.profit, 0);
+    const wins = completed.filter(s => s.profit > 0).length;
+    const profits = completed.map(s => s.profit);
+    return {
+      sessions: completed.length,
+      totalProfit,
+      totalBuyin: completed.reduce((a, s) => a + s.buyin, 0),
+      winRate: Math.round(wins / completed.length * 100),
+      avg: totalProfit / completed.length,
+      best: Math.max(...profits),
+      worst: Math.min(...profits),
+    };
+  }, [playerSessions]);
+
+  const chartData = useMemo(() => {
+    let cum = 0;
+    const data = [{ label: "Start", value: 0 }];
+    playerSessions.filter(s => s.profit !== null).forEach(s => {
+      cum += s.profit;
+      data.push({
+        label: new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+        fullLabel: s.sessionName,
+        value: Math.round(cum * 100) / 100,
+      });
+    });
+    return data;
+  }, [playerSessions]);
+
+  const CustomTooltip = ({ active, payload }) => {
+    if (!active || !payload?.length) return null;
+    const point = payload[0]?.payload;
+    return (
+      <div style={{ background: "#1a1f2b", border: "1px solid #2d3748", borderRadius: 8, padding: "10px 14px", fontSize: 12 }}>
+        <div style={{ fontWeight: 700, color: "#e5e7eb", marginBottom: 4 }}>{point?.fullLabel || point?.label}</div>
+        <div style={{ color: profitColor(payload[0].value), fontWeight: 600 }}>{fmt(payload[0].value)}</div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={S.content}>
+      <button onClick={onBack} style={{ ...S.actionBtnAlt, marginBottom: 16, display: "inline-flex" }}><ChevronIcon dir="left" size={14}/> All Players</button>
+      <h2 style={{ ...S.sessionName, marginBottom: 4 }}>{name}</h2>
+      <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>{playerSessions.length} session{playerSessions.length !== 1 ? "s" : ""}</div>
+
+      {stats && (
+        <>
+          <div style={{ ...S.statsRow, flexWrap: "wrap" }}>
+            <StatBox label="Net" value={fmt(stats.totalProfit)} color={profitColor(stats.totalProfit)} />
+            <StatBox label="Sessions" value={stats.sessions} />
+            <StatBox label="Win Rate" value={`${stats.winRate}%`} />
+            <StatBox label="Avg / Session" value={fmt(Math.round(stats.avg * 100) / 100)} color={profitColor(stats.avg)} />
+            <StatBox label="Best Win" value={stats.best > 0 ? fmt(stats.best) : "—"} color="#4ade80" />
+            <StatBox label="Worst Loss" value={stats.worst < 0 ? fmt(stats.worst) : "—"} color="#f87171" />
+          </div>
+
+          {chartData.length > 2 && (
+            <div style={{ ...S.chartCard, marginBottom: 24 }}>
+              <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>Cumulative winnings</div>
+              <div style={{ width: "100%", height: 200 }}>
+                <ResponsiveContainer>
+                  <LineChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <XAxis dataKey="label" tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={{ stroke: "#1f2937" }} tickLine={false} />
+                    <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={{ stroke: "#1f2937" }} tickLine={false} tickFormatter={v => v === 0 ? "0" : fmt(v)} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <ReferenceLine y={0} stroke="#374151" strokeDasharray="3 3" />
+                    <Line type="linear" dataKey="value" stroke="#4ade80" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      <div style={S.section}>
+        <h3 style={S.sectionTitle}>Session History</h3>
+        <div style={S.table}>
+          <div style={S.tableHead}>
+            <span style={{ flex: 2 }}>Session</span>
+            <span style={{ flex: 1.2, textAlign: "right" }}>Buy-in</span>
+            <span style={{ flex: 1.2, textAlign: "right" }}>Cash Out</span>
+            <span style={{ flex: 1.2, textAlign: "right" }}>Profit</span>
+          </div>
+          {[...playerSessions].reverse().map((s, i) => (
+            <div key={i} style={S.tableRow}>
+              <span style={{ flex: 2 }}>
+                <div style={{ fontWeight: 600, color: "#e5e7eb", fontSize: 13 }}>{s.sessionName}</div>
+                <div style={{ color: "#6b7280", fontSize: 11 }}>{new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</div>
+              </span>
+              <span style={{ flex: 1.2, textAlign: "right", color: "#9ca3af" }}>{fmtMoney(s.buyin)}</span>
+              <span style={{ flex: 1.2, textAlign: "right", color: "#9ca3af" }}>{s.cashout !== null ? fmtMoney(s.cashout) : "—"}</span>
+              <span style={{ flex: 1.2, textAlign: "right", fontWeight: 700, color: s.profit !== null ? profitColor(s.profit) : "#4b5563" }}>{s.profit !== null ? fmt(s.profit) : "—"}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

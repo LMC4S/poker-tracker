@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "hash-pwd": "node -e \"const c=require('crypto');process.stdout.write(c.createHash('sha256').update(process.argv[1]).digest('hex')+'\\n');\" --"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
