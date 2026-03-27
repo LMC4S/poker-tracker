@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import html2canvas from "html2canvas";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { supabase } from "./lib/supabase";
 
@@ -214,13 +215,34 @@ export default function PokerTracker() {
   const [modal, setModal] = useState(null);
   const [summaryId, setSummaryId] = useState(null);
 
+  const lastSaveValueRef = useRef(null);
+
   useEffect(() => {
     loadSessions().then(s => {
       if (s !== null) { setSessions(s); setSaveEnabled(true); }
       setLoaded(true);
     });
   }, []);
-  useEffect(() => { if (saveEnabled) saveSessions(sessions); }, [sessions, saveEnabled]);
+
+  useEffect(() => {
+    if (saveEnabled) {
+      lastSaveValueRef.current = JSON.stringify(sessions);
+      saveSessions(sessions);
+    }
+  }, [sessions, saveEnabled]);
+
+  useEffect(() => {
+    if (!supabase) return;
+    const channel = supabase
+      .channel("poker-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "poker_data" }, (payload) => {
+        if (!payload.new?.value) return;
+        if (payload.new.value === lastSaveValueRef.current) return; // our own echo
+        setSessions(JSON.parse(payload.new.value));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const activeSession = sessions.find(s => s.id === activeId);
   const summarySession = sessions.find(s => s.id === summaryId);
@@ -354,6 +376,46 @@ function ActiveView({ session, isAdmin, updateSession, setModal, onEnd }) {
   const cashedOutCount = session.players.filter(p => p.cashout !== null).length;
   const allCashedOut = session.players.length > 0 && cashedOutCount === session.players.length;
   const balance = allCashedOut ? totalCashouts - totalBuyins : null;
+  const cardRef = useRef(null);
+
+  const handleShare = async () => {
+    if (!cardRef.current) return;
+    await Promise.all(["400","500","600","700"].map(w => document.fonts.load(`${w} 16px 'Inter'`)));
+    const els = [cardRef.current, ...cardRef.current.querySelectorAll("*")];
+    const saved = els.map(e => e.style.fontFamily);
+    els.forEach(e => { e.style.fontFamily = "'Inter', sans-serif"; });
+    const canvas = await html2canvas(cardRef.current, {
+      backgroundColor: "#000",
+      scale: 3,
+      onclone: (_, el) => {
+        const walk = (node) => {
+          if (node.nodeType !== 1) return;
+          const s = node.style;
+          if (s.background) s.background = "#000";
+          if (s.backgroundColor) s.backgroundColor = "#000";
+          if (s.color) s.color = "#fff";
+          if (s.border) s.border = "1px solid #222";
+          if (s.borderBottom) s.borderBottom = "1px solid #1a1a1a";
+          if (s.fontWeight === "700") s.fontWeight = "500";
+          else if (s.fontWeight === "600") s.fontWeight = "400";
+          [...node.children].forEach(walk);
+        };
+        walk(el);
+      }
+    });
+    els.forEach((e, i) => { e.style.fontFamily = saved[i]; });
+    canvas.toBlob(async (blob) => {
+      const file = new File([blob], "poker-session.png", { type: "image/png" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file] });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = "poker-session.png"; a.click();
+        URL.revokeObjectURL(url);
+      }
+    });
+  };
 
   const removePlayer = (pid) => {
     updateSession(session.id, s => ({ ...s, players: s.players.filter(p => p.id !== pid) }));
@@ -367,8 +429,56 @@ function ActiveView({ session, isAdmin, updateSession, setModal, onEnd }) {
     });
   };
 
+  const dateStr = new Date(session.date).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  const sorted = [...session.players].sort((a, b) => {
+    const pa = a.cashout !== null ? a.cashout - a.buyins.reduce((s, x) => s + x, 0) : -Infinity;
+    const pb = b.cashout !== null ? b.cashout - b.buyins.reduce((s, x) => s + x, 0) : -Infinity;
+    return pb - pa;
+  });
+
   return (
     <div style={S.content}>
+      {/* Hidden share card */}
+      <div ref={cardRef} style={{ position: "absolute", left: -9999, top: 0, width: 420 }}>
+        <div style={S.summaryCard}>
+          <div style={S.summaryHeader}>
+            <div>
+              <h2 style={S.summaryTitle}>{/^Session \d+$/.test(session.name) ? dateStr : session.name}</h2>
+              <div style={S.summarySub}>{/^Session \d+$/.test(session.name) ? "" : dateStr}</div>
+            </div>
+          </div>
+          <div style={{ ...S.summaryTable, paddingTop: 14 }}>
+            <div style={S.summaryTableHead}>
+              <span style={{ flex: 0.4, textAlign: "center" }}>#</span>
+              <span style={{ flex: 2 }}>Player</span>
+              <span style={{ flex: 1.5, textAlign: "right" }}>Buy-in</span>
+              <span style={{ flex: 1.5, textAlign: "right" }}>Cash Out</span>
+              <span style={{ flex: 1.5, textAlign: "right" }}>Net</span>
+            </div>
+            {sorted.map((p, i) => {
+              const totalBuyin = p.buyins.reduce((a, x) => a + x, 0);
+              const profit = p.cashout !== null ? p.cashout - totalBuyin : null;
+              return (
+                <div key={p.id} style={S.summaryTableRow}>
+                  <span style={{ flex: 0.4, textAlign: "center", color: "#7a5030", fontSize: 12 }}>{i + 1}</span>
+                  <span style={{ flex: 2, fontWeight: 600, color: "#2a0a08" }}>{p.name}</span>
+                  <span data-num="1" style={{ flex: 1.5, textAlign: "right", color: "#2a0a08" }}>{fmtMoney(totalBuyin)}</span>
+                  <span data-num="1" style={{ flex: 1.5, textAlign: "right", color: "#2a0a08" }}>{p.cashout !== null ? fmtMoney(p.cashout) : "—"}</span>
+                  <span data-num="1" style={{ flex: 1.5, textAlign: "right", fontWeight: 700, color: profitColor(profit), fontSize: 15 }}>{profit !== null ? fmt(profit) : "—"}</span>
+                </div>
+              );
+            })}
+            <div style={S.summaryTableTotalRow}>
+              <span style={{ flex: 0.4 }}/>
+              <span style={{ flex: 2, fontWeight: 700 }}>Total</span>
+              <span data-num="1" style={{ flex: 1.5, textAlign: "right", fontWeight: 700 }}>{fmtMoney(totalBuyins)}</span>
+              <span data-num="1" style={{ flex: 1.5, textAlign: "right", fontWeight: 700 }}>{cashedOutCount > 0 ? fmtMoney(totalCashouts) : "—"}</span>
+              <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700 }}>—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div style={S.sessionHeader}>
         <h2 style={S.sessionName}>{session.name}</h2>
         <div style={S.sessionMeta}>{new Date(session.date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} · {session.players.length} players</div>
@@ -377,13 +487,14 @@ function ActiveView({ session, isAdmin, updateSession, setModal, onEnd }) {
       <div style={S.statsRow}>
         <StatBox label="Total Buy-in" value={fmtMoney(totalBuyins)} />
         <StatBox label="Cashed Out" value={`${cashedOutCount}/${session.players.length}`} />
-        {allCashedOut && <StatBox label="Balance" value={balance === 0 ? "✓ OK" : `⚠ ${fmt(balance)}`} color="#ffffff" />}
+        {allCashedOut && <StatBox label="Balance" value={balance === 0 ? "✓ OK" : fmt(balance)} color="#ffffff" />}
       </div>
 
       <div style={S.actions}>
         {isAdmin && <button onClick={() => setModal({ type: "addPlayer" })} style={S.actionBtn}><PlusIcon size={16}/> Add Player</button>}
         {isAdmin && <button onClick={() => setModal({ type: "buyin" })} style={S.actionBtnAlt}>Buy-in / Rebuy</button>}
         {isAdmin && <button onClick={() => setModal({ type: "cashout" })} style={S.actionBtnAlt}>Cash Out</button>}
+        {session.players.length > 0 && <button onClick={handleShare} style={S.actionBtnAlt}>Share</button>}
       </div>
 
       {session.players.length > 0 ? (
@@ -392,7 +503,7 @@ function ActiveView({ session, isAdmin, updateSession, setModal, onEnd }) {
             <span style={{ flex: 2 }}>Player</span>
             <span style={{ flex: 2, textAlign: "right" }}>Buy-in</span>
             <span style={{ flex: 1.5, textAlign: "right" }}>Cash Out</span>
-            <span style={{ flex: 1.5, textAlign: "right" }}>Profit</span>
+            <span style={{ flex: 1.5, textAlign: "right" }}>Net</span>
             <span style={{ flex: 0.5 }}/>
           </div>
           {session.players.map(p => {
@@ -448,6 +559,47 @@ function StatBox({ label, value, color }) {
 
 // ─── Summary View ───
 function SummaryView({ session, isAdmin, onResume, onBack }) {
+  const shareRef = useRef(null);
+
+  const handleShare = async () => {
+    if (!shareRef.current) return;
+    await Promise.all(["400","500","600","700"].map(w => document.fonts.load(`${w} 16px 'Inter'`)));
+    const els = [shareRef.current, ...shareRef.current.querySelectorAll("*")];
+    const saved = els.map(e => e.style.fontFamily);
+    els.forEach(e => { e.style.fontFamily = "'Inter', sans-serif"; });
+    const canvas = await html2canvas(shareRef.current, {
+      backgroundColor: "#000",
+      scale: 3,
+      onclone: (_, el) => {
+        const walk = (node) => {
+          if (node.nodeType !== 1) return;
+          const s = node.style;
+          if (s.background) s.background = "#000";
+          if (s.backgroundColor) s.backgroundColor = "#000";
+          if (s.color) s.color = "#fff";
+          if (s.border) s.border = "1px solid #222";
+          if (s.borderBottom) s.borderBottom = "1px solid #1a1a1a";
+          if (s.fontWeight === "700") s.fontWeight = "500";
+          else if (s.fontWeight === "600") s.fontWeight = "400";
+          [...node.children].forEach(walk);
+        };
+        walk(el);
+      }
+    });
+    els.forEach((e, i) => { e.style.fontFamily = saved[i]; });
+    canvas.toBlob(async (blob) => {
+      const file = new File([blob], "poker-session.png", { type: "image/png" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file] });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = "poker-session.png"; a.click();
+        URL.revokeObjectURL(url);
+      }
+    });
+  };
+
   const sorted = [...session.players].sort((a, b) => {
     const pa = a.cashout !== null ? a.cashout - a.buyins.reduce((s, x) => s + x, 0) : -Infinity;
     const pb = b.cashout !== null ? b.cashout - b.buyins.reduce((s, x) => s + x, 0) : -Infinity;
@@ -461,9 +613,49 @@ function SummaryView({ session, isAdmin, onResume, onBack }) {
 
   return (
     <div style={S.content}>
+      {/* Hidden share card — off-screen so font swap during capture is invisible */}
+      <div ref={shareRef} style={{ position: "absolute", left: -9999, top: 0, width: 420 }}>
+        <div style={S.summaryCard}>
+          <div style={S.summaryHeader}>
+            <div>
+              <h2 style={S.summaryTitle}>{/^Session \d+$/.test(session.name) ? dateStr : session.name}</h2>
+              <div style={S.summarySub}>{/^Session \d+$/.test(session.name) ? "" : dateStr}</div>
+            </div>
+          </div>
+          <div style={{ ...S.summaryTable, paddingTop: 14 }}>
+            <div style={S.summaryTableHead}>
+              <span style={{ flex: 0.4, textAlign: "center" }}>#</span>
+              <span style={{ flex: 2 }}>Player</span>
+              <span style={{ flex: 1.5, textAlign: "right" }}>Buy-in</span>
+              <span style={{ flex: 1.5, textAlign: "right" }}>Cash Out</span>
+              <span style={{ flex: 1.5, textAlign: "right" }}>Net</span>
+            </div>
+            {sorted.map((p, i) => {
+              const totalBuyin = p.buyins.reduce((a, x) => a + x, 0);
+              const profit = p.cashout !== null ? p.cashout - totalBuyin : null;
+              return (
+                <div key={p.id} style={S.summaryTableRow}>
+                  <span style={{ flex: 0.4, textAlign: "center", color: "#7a5030", fontSize: 12 }}>{i + 1}</span>
+                  <span style={{ flex: 2, fontWeight: 600, color: "#2a0a08" }}>{p.name}</span>
+                  <span style={{ flex: 1.5, textAlign: "right", color: "#2a0a08" }}>{fmtMoney(totalBuyin)}</span>
+                  <span style={{ flex: 1.5, textAlign: "right", color: "#2a0a08" }}>{p.cashout !== null ? fmtMoney(p.cashout) : "—"}</span>
+                  <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700, color: profit !== null ? profitColor(profit) : "#707070", fontSize: 15 }}>{profit !== null ? fmt(profit) : "—"}</span>
+                </div>
+              );
+            })}
+            <div style={S.summaryTableTotalRow}>
+              <span style={{ flex: 0.4 }}/>
+              <span style={{ flex: 2, fontWeight: 700 }}>Total</span>
+              <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700 }}>{fmtMoney(totalBuyins)}</span>
+              <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700 }}>{fmtMoney(totalCashouts)}</span>
+              <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700, color: allCashedOut ? profitColor(balance) : "#707070" }}>{allCashedOut ? fmt(balance) : "—"}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      {/* Visible summary card */}
       <div style={S.summaryCard}>
         <div style={S.summaryHeader}>
-          <span style={S.summaryLogo}>♠</span>
           <div>
             <h2 style={S.summaryTitle}>{session.name}</h2>
             <div style={S.summarySub}>{dateStr}</div>
@@ -472,16 +664,16 @@ function SummaryView({ session, isAdmin, onResume, onBack }) {
         <div style={S.summaryStatsRow}>
           <div style={S.summaryStatBox}>
             <div style={S.summaryStatLabel}>Players</div>
-            <div style={S.summaryStatVal}>{session.players.length}</div>
+            <div data-num="1" style={S.summaryStatVal}>{session.players.length}</div>
           </div>
           <div style={S.summaryStatBox}>
             <div style={S.summaryStatLabel}>Total Buy-in</div>
-            <div style={S.summaryStatVal}>{fmtMoney(totalBuyins)}</div>
+            <div data-num="1" style={S.summaryStatVal}>{fmtMoney(totalBuyins)}</div>
           </div>
           {allCashedOut && (
             <div style={S.summaryStatBox}>
               <div style={S.summaryStatLabel}>Balance</div>
-              <div style={{ ...S.summaryStatVal, color: "#2a0a08" }}>{balance === 0 ? "✓" : `⚠ ${fmt(balance)}`}</div>
+              <div data-num="1" style={{ ...S.summaryStatVal, color: "#2a0a08" }}>{balance === 0 ? "✓" : fmt(balance)}</div>
             </div>
           )}
         </div>
@@ -491,7 +683,7 @@ function SummaryView({ session, isAdmin, onResume, onBack }) {
             <span style={{ flex: 2 }}>Player</span>
             <span style={{ flex: 1.5, textAlign: "right" }}>Buy-in</span>
             <span style={{ flex: 1.5, textAlign: "right" }}>Cash Out</span>
-            <span style={{ flex: 1.5, textAlign: "right" }}>Profit</span>
+            <span style={{ flex: 1.5, textAlign: "right" }}>Net</span>
           </div>
           {sorted.map((p, i) => {
             const totalBuyin = p.buyins.reduce((a, x) => a + x, 0);
@@ -500,27 +692,33 @@ function SummaryView({ session, isAdmin, onResume, onBack }) {
               <div key={p.id} style={S.summaryTableRow}>
                 <span style={{ flex: 0.4, textAlign: "center", color: "#7a5030", fontSize: 12 }}>{i + 1}</span>
                 <span style={{ flex: 2, fontWeight: 600, color: "#2a0a08" }}>
-                  {p.name}{i === 0 && profit > 0 && <span style={{ marginLeft: 6, fontSize: 12 }}>👑</span>}
+                  {p.name}
                 </span>
-                <span style={{ flex: 1.5, textAlign: "right", color: "#2a0a08" }}>{fmtMoney(totalBuyin)}</span>
-                <span style={{ flex: 1.5, textAlign: "right", color: "#2a0a08" }}>{p.cashout !== null ? fmtMoney(p.cashout) : "—"}</span>
-                <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700, color: profit !== null ? profitColor(profit) : "#707070", fontSize: 15 }}>{profit !== null ? fmt(profit) : "—"}</span>
+                <span data-num="1" style={{ flex: 1.5, textAlign: "right", color: "#2a0a08" }}>{fmtMoney(totalBuyin)}</span>
+                <span data-num="1" style={{ flex: 1.5, textAlign: "right", color: "#2a0a08" }}>{p.cashout !== null ? fmtMoney(p.cashout) : "—"}</span>
+                <span data-num="1" style={{ flex: 1.5, textAlign: "right", fontWeight: 700, color: profit !== null ? profitColor(profit) : "#707070", fontSize: 15 }}>{profit !== null ? fmt(profit) : "—"}</span>
               </div>
             );
           })}
           <div style={S.summaryTableTotalRow}>
             <span style={{ flex: 0.4 }}/>
             <span style={{ flex: 2, fontWeight: 700 }}>Total</span>
-            <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700 }}>{fmtMoney(totalBuyins)}</span>
-            <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700 }}>{fmtMoney(totalCashouts)}</span>
-            <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700, color: allCashedOut ? profitColor(balance) : "#707070" }}>{allCashedOut ? fmt(balance) : "—"}</span>
+            <span data-num="1" style={{ flex: 1.5, textAlign: "right", fontWeight: 700 }}>{fmtMoney(totalBuyins)}</span>
+            <span data-num="1" style={{ flex: 1.5, textAlign: "right", fontWeight: 700 }}>{fmtMoney(totalCashouts)}</span>
+            <span data-num="1" style={{ flex: 1.5, textAlign: "right", fontWeight: 700, color: allCashedOut ? profitColor(balance) : "#707070" }}>{allCashedOut ? fmt(balance) : "—"}</span>
           </div>
         </div>
-        <div style={S.summaryFooter}>Home Game Tracker · {new Date(session.date).toLocaleDateString()}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 24px 12px" }}>
+          <span style={{ color: "#c4a882", fontSize: 16, lineHeight: 1 }}>❧</span>
+          <div style={{ flex: 1, height: 1, background: "#c4a882", opacity: 0.6 }} />
+          <span style={{ color: "#c4a882", fontSize: 16, lineHeight: 1 }}>☙</span>
+        </div>
       </div>
+
       <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
         <button onClick={onBack} style={S.actionBtnAlt}><ChevronIcon dir="left" size={14}/> Home</button>
         {isAdmin && session.ended && <button onClick={onResume} style={S.actionBtnAlt}>Reopen Session</button>}
+        <button onClick={handleShare} style={S.actionBtnAlt}>Share</button>
       </div>
     </div>
   );
@@ -564,7 +762,7 @@ function HistoryView({ sessions, isAdmin, onOpen, onDelete }) {
             {leaderboard.map(([name, st], i) => (
               <div key={name} style={S.tableRow}>
                 <span style={{ flex: 0.3, textAlign: "center", color: "#7a5030" }}>{i + 1}</span>
-                <span style={{ flex: 2, fontWeight: 600, color: "#2a0a08" }}>{name}{i === 0 && " 👑"}</span>
+                <span style={{ flex: 2, fontWeight: 600, color: "#2a0a08" }}>{name}</span>
                 <span style={{ flex: 1, textAlign: "right", color: "#2a0a08" }}>{st.sessions}</span>
                 <span style={{ flex: 1, textAlign: "right", color: "#2a0a08" }}>{Math.round(st.wins / st.sessions * 100)}%</span>
                 <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700, color: profitColor(st.totalProfit) }}>{fmt(st.totalProfit)}</span>
@@ -957,7 +1155,7 @@ function AnalyticsView({ sessions, isAdmin, isSuperAdmin, onExport }) {
             </div>
             {detailedStats.map((st, i) => (
               <div key={st.name} style={S.tableRow}>
-                <span style={{ flex: 1.8, fontWeight: 600, color: "#2a0a08" }}>{i === 0 && "👑 "}{st.name}</span>
+                <span style={{ flex: 1.8, fontWeight: 600, color: "#2a0a08" }}>{st.name}</span>
                 <span style={{ flex: 0.7, textAlign: "right", color: "#2a0a08" }}>{st.sessions}</span>
                 <span style={{ flex: 0.8, textAlign: "right", color: "#2a0a08" }}>{Math.round(st.wins / st.sessions * 100)}%</span>
                 <span style={{ flex: 1.2, textAlign: "right", fontWeight: 700, color: profitColor(st.totalProfit) }}>{fmt(st.totalProfit)}</span>
@@ -1123,7 +1321,7 @@ function PlayerProfile({ name, sessions, onBack }) {
             <span style={{ flex: 2 }}>Session</span>
             <span style={{ flex: 1.2, textAlign: "right" }}>Buy-in</span>
             <span style={{ flex: 1.2, textAlign: "right" }}>Cash Out</span>
-            <span style={{ flex: 1.2, textAlign: "right" }}>Profit</span>
+            <span style={{ flex: 1.2, textAlign: "right" }}>Net</span>
           </div>
           {[...playerSessions].reverse().map((s, i) => (
             <div key={i} style={S.tableRow}>
@@ -1275,7 +1473,7 @@ const S = {
   actions: { display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" },
   actionBtn: { padding: "10px 16px", background: "#450206", color: "#ffffff", border: "none", borderRadius: 24, fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, letterSpacing: "1.5px", textTransform: "uppercase", fontFamily: F },
   actionBtnAlt: { padding: "10px 14px", background: "#fbf0df", color: "#450206", border: "1px solid #d4b898", borderRadius: 24, fontSize: 11, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, letterSpacing: "1px", textTransform: "uppercase", fontFamily: F },
-  table: { background: "#f0e0c4", border: "1px solid #d4b898", borderRadius: 10, overflow: "hidden" },
+  table: { background: "#f0e0c4", border: "1px solid #d4b898", borderRadius: 10, overflow: "hidden", fontVariantNumeric: "lining-nums tabular-nums" },
   tableHead: { display: "flex", padding: "10px 14px", fontSize: 9, color: "#7a5030", textTransform: "uppercase", letterSpacing: 1.5, borderBottom: "1px solid #d4b898", fontFamily: F },
   tableRow: { display: "flex", padding: "11px 14px", alignItems: "center", borderBottom: "1px solid rgba(212,184,152,0.6)", fontSize: 15 },
   tableTotal: { display: "flex", padding: "11px 14px", alignItems: "center", fontSize: 15, color: "#2a0a08", background: "rgba(69,2,6,0.06)" },
@@ -1294,7 +1492,7 @@ const S = {
   summaryStatBox: { flex: 1, background: "rgba(69,2,6,0.06)", border: "1px solid rgba(69,2,6,0.2)", borderRadius: 10, padding: "12px", minWidth: 80, textAlign: "center" },
   summaryStatLabel: { fontSize: 9, color: "#7a5030", textTransform: "uppercase", letterSpacing: 1.5, fontFamily: F },
   summaryStatVal: { fontSize: 26, fontWeight: 700, color: "#2a0a08" },
-  summaryTable: { margin: "0 12px" },
+  summaryTable: { margin: "0 12px", fontVariantNumeric: "lining-nums tabular-nums", fontFeatureSettings: '"lnum", "tnum"' },
   summaryTableHead: { display: "flex", padding: "8px 10px", fontSize: 9, color: "#7a5030", textTransform: "uppercase", letterSpacing: 1.5, borderBottom: "1px solid #d4b898", fontFamily: F },
   summaryTableRow: { display: "flex", padding: "10px 10px", alignItems: "center", fontSize: 15, borderBottom: "1px solid rgba(212,184,152,0.5)" },
   summaryTableTotalRow: { display: "flex", padding: "10px 10px", alignItems: "center", fontSize: 15, color: "#2a0a08", background: "rgba(69,2,6,0.06)", borderRadius: "0 0 8px 8px" },

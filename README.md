@@ -10,6 +10,8 @@ A personal poker session tracker — built with React + Vite, persisted to Supab
 - Track players, buy-ins, rebuys, and cash-outs
 - Auto-calculates profit/loss per player
 - Three-role password system: super admin, admin, and view-only
+- Real-time sync — all open browsers update live when any change is made
+- Share session as a high-resolution image card (3× scale, black background, white text) — title shows session name, or falls back to the full date when the name is auto-generated
 - JSON backup and restore of all session data
 
 ---
@@ -31,7 +33,7 @@ A personal poker session tracker — built with React + Vite, persisted to Supab
 poker_tracker_react/
 ├── src/
 │   ├── main.jsx          # React entry point
-│   ├── App.jsx           # Entire app (single-file component, ~1000 lines)
+│   ├── App.jsx           # Entire app (single-file component, ~1500 lines)
 │   └── lib/
 │       └── supabase.js   # Supabase client (null-safe, falls back to localStorage)
 ├── index.html
@@ -50,8 +52,8 @@ Three passwords, each hashed with SHA-256 and stored as env vars. The actual pas
 | Role | Nav tabs visible | What they can do |
 |---|---|---|
 | **Super Admin** | Home, Session, History, Players, Stats | Full access. Sees all sessions, real names, all-time data, cumulative charts, player search |
-| **Admin** | Home, Session, Stats | Can create/edit/delete sessions. Stats shows real names, last 4 sessions only, highlight cards, no chart |
-| **View-only** | Home, Stats | Read-only. Same limited Stats view as admin. All edit buttons hidden |
+| **Admin** | Home, Session | Can create/edit/delete sessions. No Stats tab. |
+| **View-only** | Home | Read-only. All edit buttons hidden. No Stats tab. |
 
 ### Tab breakdown
 
@@ -59,21 +61,7 @@ Three passwords, each hashed with SHA-256 and stored as env vars. The actual pas
 - **Session** — live session management (add players, buy-ins, cash-outs, end session). Admin only controls.
 - **History** — (super admin only) all-time leaderboard + full list of past sessions.
 - **Players** — (super admin only) search any player by name, view their full profile: stat cards, cumulative chart, session-by-session history.
-- **Stats** — visible to all roles, but content differs by role (see above).
-
-### Stats view by role
-
-**Super Admin (full):**
-- Cumulative winnings chart (all sessions, all regular players)
-- Player stats table: sessions, win %, net, avg, best, worst (all time)
-
-**Admin / View-only (limited):**
-- Highlight cards based on last 4 sessions:
-  - 🔥 Hot Streak — most consecutive profitable sessions
-  - 🏆 Best Single Win — highest single-session profit
-  - 🎯 Most Consistent — lowest variance across sessions
-  - 📅 Buy-in Monster — who bought in the most
-- Player stats table: sessions, win %, net, avg (last 4 sessions only)
+- **Stats** — (super admin only) cumulative winnings chart + player stats table (all time).
 
 ---
 
@@ -174,7 +162,7 @@ RLS restricts all access to only the one storage key. No row can be deleted via 
 
 ## Backup and restore
 
-In the Stats tab (admin role), there is a **Backup All Sessions (JSON)** button that downloads a `.json` file of all session data. Keep this somewhere safe periodically.
+In the Stats tab (super admin only), there is a **Backup All Sessions (JSON)** button that downloads a `.json` file of all session data. Keep this somewhere safe periodically.
 
 There is intentionally no restore button in the UI (security risk — anyone with admin access could overwrite all data). To restore: open the Supabase table editor, find the `poker-sessions-v2` row, and paste the JSON into the `value` column manually.
 
@@ -206,7 +194,7 @@ Without `.env.local`, the app falls back to `localStorage` automatically — use
 - **Supabase anon key** — safe to be public. It's a publishable key, not a secret. RLS policies are the actual protection.
 - **RLS** — restricts access to the single data row. No delete policy exists, so data cannot be wiped via the API.
 - **GitHub repo is private** — the storage key `poker-sessions-v2` is in the source code; keeping the repo private reduces exposure.
-- **No real-time sync** — two people saving simultaneously will overwrite each other. Designed for one admin managing sessions at a time.
+- **Real-time sync** — Supabase real-time pushes changes to all connected browsers instantly. Requires real-time enabled on the `poker_data` table in Supabase dashboard (Database → Replication → toggle `poker_data` on).
 
 ---
 
@@ -239,4 +227,4 @@ All inputs are set to `font-size: 16px` to prevent iOS Safari from auto-zooming 
 
 - **Single shared dataset** — all users with a password see and modify the same data. Not suitable if you need per-user isolation.
 - **No delete via API** — intentional. To delete bad data, use the Supabase table editor directly.
-- **No real-time collaboration** — last write wins. One person should manage an active session at a time.
+- **Simultaneous edits** — real-time sync is live but last write wins. Only one admin should manage an active session at a time to avoid conflicts.
