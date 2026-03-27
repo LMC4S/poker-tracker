@@ -32,15 +32,33 @@ A personal poker session tracker — built with React + Vite, persisted to Supab
 ```
 poker_tracker_react/
 ├── src/
-│   ├── main.jsx          # React entry point
-│   ├── App.jsx           # Entire app (single-file component, ~1500 lines)
-│   └── lib/
-│       └── supabase.js   # Supabase client (null-safe, falls back to localStorage)
+│   ├── main.jsx              # React entry point
+│   ├── App.jsx               # Main orchestrator (~88 lines)
+│   ├── utils.js              # Constants, helpers, sha256, exportJSON
+│   ├── storage.js            # loadSessions / saveSessions (Supabase + localStorage)
+│   ├── share.js              # handleShare — generates & shares PNG card
+│   ├── styles.js             # S styles object, font vars, global style injection
+│   ├── lib/
+│   │   └── supabase.js       # Supabase client (null-safe, falls back to localStorage)
+│   ├── components/
+│   │   ├── PinGate.jsx       # Password auth gate (3 roles, lockout logic)
+│   │   ├── Header.jsx        # Nav bar
+│   │   ├── Modal.jsx         # New session / add player / buy-in / cash-out modals
+│   │   ├── SessionCard.jsx   # Session list card
+│   │   ├── StatBox.jsx       # Stat display box
+│   │   └── icons.jsx         # SVG icon components
+│   └── views/
+│       ├── HomeView.jsx      # Home screen
+│       ├── ActiveView.jsx    # Live session management
+│       ├── SummaryView.jsx   # Completed session summary + share card
+│       ├── HistoryView.jsx   # All-time leaderboard + past sessions
+│       ├── AnalyticsView.jsx # Cumulative charts, stats, correlation matrix
+│       └── PlayerSearchView.jsx # Player search + individual profiles
 ├── index.html
 ├── vite.config.js
 ├── package.json
-├── supabase-schema.sql   # Run once in Supabase SQL Editor to create the table
-└── .env.example          # Template for required environment variables
+├── supabase-schema.sql       # Run once in Supabase SQL Editor to create the table
+└── .env.example              # Template for required environment variables
 ```
 
 ---
