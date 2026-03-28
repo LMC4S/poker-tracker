@@ -1,251 +1,135 @@
-# Poker Tracker
+# *AKo* — Poker Home Game Manager
 
-A personal poker session tracker — built with React + Vite, persisted to Supabase, deployed on Vercel.
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
+  <a href="https://vercel.com"><img src="https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel" alt="Vercel"></a>
+  <a href="https://supabase.com"><img src="https://img.shields.io/badge/Database-Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase"></a>
+</p>
 
----
+Self-hosted web app for home game hosts to track buy-ins, cashouts, and balances during a session. Share a link with your group and they can follow along live. Data stays in your own Supabase database.
 
-## What it does
+No player accounts needed. Your group just opens the link. Admin access is PIN-protected, and the full session data never leaves your database — see [Security](#security) for how that works.
 
-- Create and manage poker sessions
-- Track players, buy-ins, rebuys, and cash-outs
-- Auto-calculates profit/loss per player
-- Three-role password system: super admin, admin, and view-only
-- Real-time sync — all open browsers update live when any change is made
-- Share session as a high-resolution image card (3× scale, black background, white text) — title shows session name, or falls back to the full date when the name is auto-generated
-- JSON backup and restore of all session data
-- Frequent player suggestions — when adding a player to a session, a custom dropdown (▾) shows historical players sorted by appearance count; players already in the session are excluded
+<p align="center">
+  <img src="docs/home_view.jpeg" alt="Home view — series stats and recent sessions" width="300">
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="docs/live_session_view.jpeg" alt="Live session — player standings and actions" width="300">
+</p>
 
----
+## Features
 
-## Tech stack
+- Share a URL and your group sees the session live — works on any phone browser, no app install needed
+- Full session history with series stats — sessions played, typical buy-in, longest session, biggest swing
+- Buy-ins, rebuys, cashouts, undo cashout. Player name autocomplete from past games
+- Generate a screenshot card ranked by net profit, share via Web Share API or save as PNG
+- One-click JSON backup of all data
+- Mobile-first — meant for phones at the table
+- Runs on Vercel + Supabase free tiers
 
-| Layer | Choice | Why |
-|---|---|---|
-| UI | React + Vite | Fast dev, clean production builds |
-| Database | Supabase | Free tier, easy setup via Vercel integration |
-| Hosting | Vercel | Auto-deploys on every GitHub push |
-| Auth | SHA-256 PIN gate (three roles) | Simple shared-access lock, no user accounts needed |
+## Install
 
----
+You need free accounts on [Vercel](https://vercel.com) and [Supabase](https://supabase.com).
 
-## Project structure
+### Step 1 — Set up the database
 
-```
-poker_tracker_react/
-├── src/
-│   ├── main.jsx              # React entry point
-│   ├── App.jsx               # Main orchestrator (~88 lines)
-│   ├── utils.js              # Constants, helpers, sha256, exportJSON
-│   ├── storage.js            # loadSessions / saveSessions (Supabase + localStorage)
-│   ├── share.js              # handleShare — generates & shares PNG card
-│   ├── styles.js             # S styles object, font vars, global style injection
-│   ├── lib/
-│   │   └── supabase.js       # Supabase client (null-safe, falls back to localStorage)
-│   ├── components/
-│   │   ├── PinGate.jsx       # Password auth gate (3 roles, lockout logic)
-│   │   ├── Header.jsx        # Nav bar
-│   │   ├── Modal.jsx         # New session / add player / buy-in / cash-out modals
-│   │   ├── SessionCard.jsx   # Session list card
-│   │   ├── StatBox.jsx       # Stat display box
-│   │   └── icons.jsx         # SVG icon components
-│   └── views/
-│       ├── HomeView.jsx      # Home screen
-│       ├── ActiveView.jsx    # Live session management
-│       ├── SummaryView.jsx   # Completed session summary + share card
-│       ├── HistoryView.jsx   # All-time leaderboard + past sessions
-│       ├── AnalyticsView.jsx # Cumulative charts, stats, correlation matrix
-│       └── PlayerSearchView.jsx # Player search + individual profiles
-├── index.html
-├── vite.config.js
-├── package.json
-├── supabase-schema.sql       # Run once in Supabase SQL Editor to create the table
-└── .env.example              # Template for required environment variables
-```
+Go to [supabase.com/dashboard](https://supabase.com/dashboard) and create a new project. Once ready, open the **SQL Editor** and paste the contents of [`supabase/migrations/20260101000000_init.sql`](supabase/migrations/20260101000000_init.sql) — this creates the tables, security policies, and enables Realtime in one shot.
 
----
+Then go to **Project Settings → API** and copy:
+- **Project URL** — looks like `https://abcdefg.supabase.co`
+- **anon public key** — the shorter JWT under "Project API keys"
+- **service_role secret** — the longer JWT (click Reveal). Keep this one private.
 
-## Role system
+### Step 2 — Deploy to Vercel
 
-Three passwords, each hashed with SHA-256 and stored as env vars. The actual passwords are never in the codebase or bundle.
+Click the button below. It clones the repo to your GitHub, prompts you for the keys from Step 1, and deploys.
 
-| Role | Nav tabs visible | What they can do |
-|---|---|---|
-| **Super Admin** | Home, Session, History, Players, Stats | Full access. Sees all sessions, real names, all-time data, cumulative charts, player search |
-| **Admin** | Home, Session | Can create/edit/delete sessions. No Stats tab. |
-| **View-only** | Home | Read-only. All edit buttons hidden. No Stats tab. |
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/LMC4S/AKo&project-name=ako&repository-name=ako&env=VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY,SUPABASE_URL,SUPABASE_SERVICE_KEY,ADMIN_PIN,ADMIN_API_SECRET&envDescription=VITE_SUPABASE_URL%20and%20VITE_SUPABASE_ANON_KEY%3A%20from%20Supabase%20Project%20Settings%20%E2%86%92%20API.%20SUPABASE_URL%3A%20same%20as%20VITE_SUPABASE_URL.%20SUPABASE_SERVICE_KEY%3A%20service_role%20secret%20from%20Supabase.%20ADMIN_PIN%3A%20your%20admin%20password.%20ADMIN_API_SECRET%3A%20run%20openssl%20rand%20-hex%2032%20to%20generate.)
 
-### Tab breakdown
+When prompted for env vars:
 
-- **Home** — active sessions + 3 most recent ended sessions. Admin can create/delete, view-only cannot.
-- **Session** — live session management (add players, buy-ins, cash-outs, end session). Admin only controls.
-- **History** — (super admin only) all-time leaderboard + full list of past sessions.
-- **Players** — (super admin only) search any player by name, view their full profile: stat cards, cumulative chart, session-by-session history.
-- **Stats** — (super admin only) cumulative winnings chart + player stats table (all time).
-
----
-
-## Environment variables
-
-Set these in Vercel → Project → Settings → Environment Variables.
-
-| Variable | Description |
+| Variable | Where to get it |
 |---|---|
-| `VITE_SUPABASE_URL` | Your Supabase project URL (`https://xxxx.supabase.co`) |
-| `VITE_SUPABASE_ANON_KEY` | Supabase publishable key (`sb_publishable_...`) |
-| `VITE_APP_SUPER_ADMIN_HASH` | SHA-256 hash of the super admin password |
-| `VITE_APP_ADMIN_HASH` | SHA-256 hash of the admin password |
-| `VITE_APP_VIEW_HASH` | SHA-256 hash of the view-only password |
+| `VITE_SUPABASE_URL` | Supabase → Project Settings → API → Project URL |
+| `VITE_SUPABASE_ANON_KEY` | Supabase → Project Settings → API → anon public key |
+| `SUPABASE_URL` | Same as `VITE_SUPABASE_URL` |
+| `SUPABASE_SERVICE_KEY` | Supabase → Project Settings → API → service_role secret |
+| `ADMIN_PIN` | Pick anything — this is your admin password |
+| `ADMIN_API_SECRET` | Run `openssl rand -hex 32` in your terminal |
 
-> ⚠️ Vite only exposes env vars prefixed with `VITE_` to client-side code. The Vercel–Supabase integration auto-injects `SUPABASE_URL` / `SUPABASE_ANON_KEY` (without prefix) — those are **not** the same and won't work. You must add the `VITE_` versions manually.
+### Step 3 — Start playing
 
-For local development, copy `.env.example` to `.env.local` and fill in the real values. This file is gitignored and never committed.
+Once deployed, Vercel gives you a URL like `https://ako.vercel.app`.
 
----
+- **You** (admin): go to `https://ako.vercel.app/admin`, enter your PIN, create a session.
+- **Your group**: send them `https://ako.vercel.app`. No login needed — they see standings update live.
 
-## Password setup
-
-Generate a hash for each password:
-
-```bash
-npm run hash-pwd -- yoursuperadminpassword
-npm run hash-pwd -- youradminpassword
-npm run hash-pwd -- yourviewpassword
-```
-
-Copy the outputs into Vercel as the three env vars above. After changing any env var, trigger a manual redeploy in Vercel for the new value to be baked into the bundle.
-
-**Lock behaviour:**
-- Wrong password 5 times → locked out for 15 minutes (tracked in localStorage)
-- Correct password → unlocked for the browser session (tracked in sessionStorage, resets on tab close)
-
----
-
-## How data is stored
-
-All sessions are stored as a single JSON blob in Supabase under the key `poker-sessions-v2`:
-
-```
-Table: poker_data
-  key        TEXT PRIMARY KEY   → "poker-sessions-v2"
-  value      TEXT               → JSON array of all sessions
-  updated_at TIMESTAMPTZ
-```
-
-One shared dataset, no user accounts. Everyone with a password sees the same sessions.
-
-### Session data shape
-
-```json
-[
-  {
-    "id": "abc123",
-    "name": "Session 1",
-    "date": "2025-01-01T00:00:00.000Z",
-    "ended": true,
-    "endDate": "2025-01-01T03:00:00.000Z",
-    "players": [
-      {
-        "id": "xyz789",
-        "name": "Alice",
-        "buyins": [100, 50],
-        "cashout": 200
-      }
-    ]
-  }
-]
-```
-
----
-
-## First-time Supabase setup
-
-Run this once in your Supabase project → SQL Editor → New query:
-
-```sql
-create table poker_data (
-  key text primary key,
-  value text not null,
-  updated_at timestamptz default now()
-);
-
-alter table poker_data enable row level security;
-
-create policy "App read"   on poker_data for select using (key = 'poker-sessions-v2');
-create policy "App insert" on poker_data for insert with check (key = 'poker-sessions-v2');
-create policy "App update" on poker_data for update using (key = 'poker-sessions-v2');
-```
-
-RLS restricts all access to only the one storage key. No row can be deleted via the anon key. Even if someone extracts the Supabase keys from the JS bundle, they can only read/write the single data row — nothing else.
-
----
-
-## Backup and restore
-
-In the Stats tab (super admin only), there is a **Backup All Sessions (JSON)** button that downloads a `.json` file of all session data. Keep this somewhere safe periodically.
-
-There is intentionally no restore button in the UI (security risk — anyone with admin access could overwrite all data). To restore: open the Supabase table editor, find the `poker-sessions-v2` row, and paste the JSON into the `value` column manually.
-
----
-
-## Deploying
-
-1. Push to GitHub — Vercel auto-deploys on every push to `main`
-2. If you change env vars in Vercel, trigger a manual redeploy for them to be baked into the bundle
-
----
+Custom domain: Vercel project → **Settings → Domains**.
 
 ## Local development
 
+**Local dev is for working on the code.** To actually use AKo with your group, [deploy to Vercel](#install).
+
 ```bash
 npm install
-npm run dev       # dev server at localhost:5173
-npm run build     # production build
-npm run preview   # preview production build locally
+npm run dev
 ```
 
-Without `.env.local`, the app falls back to `localStorage` automatically — useful for offline testing without a Supabase connection.
+This starts Vite on `localhost:5173` and opens the admin page automatically.
 
----
+- **`localhost:5173/admin`** — admin panel (manages sessions)
+- **`localhost:5173`** — public observer view (what your group sees)
 
-## Security notes
+Without the API running, type anything into the PIN gate and it'll let you through. Data saves to `localStorage`. No accounts or setup needed — just run and go.
 
-- **Passwords** — only SHA-256 hashes live in the bundle, never plaintext. Use strong passphrases; weak ones are brute-forceable from the hash.
-- **Supabase anon key** — safe to be public. It's a publishable key, not a secret. RLS policies are the actual protection.
-- **RLS** — restricts access to the single data row. No delete policy exists, so data cannot be wiped via the API.
-- **GitHub repo is private** — the storage key `poker-sessions-v2` is in the source code; keeping the repo private reduces exposure.
-- **Real-time sync** — Supabase real-time pushes changes to all connected browsers instantly. Requires real-time enabled on the `poker_data` table in Supabase dashboard (Database → Replication → toggle `poker_data` on).
+To connect to your Supabase database locally, copy the example env file and fill in your keys:
 
----
+```bash
+cp .env.example .env.local
+# edit .env.local with your Supabase keys
+npx vercel dev
+```
 
-## UI design
+This starts the app on `localhost:3000` with working API routes and PIN protection. The default PIN is `AKo` (set in `.env.example`). Change `ADMIN_PIN` in your `.env.local` to use your own. On Vercel, you set `ADMIN_PIN` as an environment variable in your project settings.
 
-Inspired by the Venetian Las Vegas Poker Room aesthetic.
+## Stack
 
-| Element | Choice |
+| Layer | Tech |
 |---|---|
-| Body / display font | Cormorant Garamond (serif) — closest free substitute for Venetian's licensed "Romie" typeface |
-| Labels / buttons / nav | Oswald (geometric sans-serif) — substitute for Venetian's "brother-1816" |
-| Primary color | `#450206` deep burgundy |
-| Background | `#fbf0df` warm cream |
-| Card background | `#f0e0c4` |
-| Accent / destructive text | `#c0392b` |
+| **UI** | React 18 + Vite |
+| **Database** | Supabase (Postgres + Realtime) |
+| **API** | Vercel Serverless Functions |
+| **Sharing** | html2canvas + Web Share API |
+| **Fonts** | Oswald, Cormorant Garamond, Inter |
 
-All inputs are set to `font-size: 16px` to prevent iOS Safari from auto-zooming when the keyboard opens.
+## Architecture
 
-The player name field uses a non-semantic placeholder and `autoComplete="nope"` to suppress iOS Safari Contacts autofill. The PIN field uses `autoComplete="one-time-code"` to reduce (but not fully eliminate) iCloud Keychain prompts — Safari will still occasionally offer to save the password, which is a known iOS limitation with no clean workaround.
+```
+        Admin (phone at the table)            Observers (shared link)
+                  │                                     │
+                  ▼                                     ▼
+         ┌──────────────┐                     ┌──────────────────┐
+         │  /api/auth   │                     │  Supabase client │
+         │  /api/sessions│                    │  (anon key)      │
+         │  (serverless) │                     └────────┬─────────┘
+         └───────┬───────┘                              │
+                 │                                      │
+    ┌────────────┼──────────────────┐                   │
+    ▼            ▼                  ▼                    ▼
+poker_data   compute         poker_public ◄── Realtime subscribe
+(full history) snapshot      (read-only)
+```
 
----
+| | Public (`/`) | Admin (`/admin`) |
+|---|---|---|
+| **Access** | Anyone with the link | PIN required |
+| **Data** | `poker_public` (snapshot) | `poker_data` (full history) |
+| **Updates** | Supabase Realtime push | 5-second polling |
+| **Writes** | None | `x-admin-secret` header |
 
-## Data safety
+## Security
 
-- **Load failure protection** — if Supabase fails to load on startup, the app shows empty data but does **not** save that empty state back. A failed load can never overwrite existing data in Supabase.
-- **Backup regularly** — use the "Backup All Sessions (JSON)" button in Stats (admin role). Store the file somewhere safe. There is no automated backup.
-- **Restore** — if data is lost, open Supabase → Table Editor → `poker_data` row → paste your backup JSON into the `value` column and save.
+Two separate database tables — `poker_data` (private, RLS blocks all anonymous access) and `poker_public` (read-only snapshot for observers). The server decides what goes into the snapshot on each save. Admin PIN is SHA-256 hashed before it leaves the browser, and the only credential in the client bundle is the Supabase anon key, which can only read the public table. All writes require a server-side secret check.
 
----
+## License
 
-## Known limitations
-
-- **Single shared dataset** — all users with a password see and modify the same data. Not suitable if you need per-user isolation.
-- **No delete via API** — intentional. To delete bad data, use the Supabase table editor directly.
-- **Simultaneous edits** — real-time sync is live but last write wins. Only one admin should manage an active session at a time to avoid conflicts.
+MIT

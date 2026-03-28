@@ -36,18 +36,24 @@ function AppContent({ isAdmin }) {
     pendingSaveRef.current = setTimeout(() => saveSessions(sessions), 300);
   }, [sessions, saveEnabled]);
 
-  // Poll every 5s to sync across admin devices
+  // Poll every 5s to sync across admin devices — pause when tab is hidden
   useEffect(() => {
     if (!saveEnabled) return;
-    const interval = setInterval(async () => {
+    let interval = null;
+    const poll = async () => {
       const fresh = await loadSessions();
       if (fresh === null) return;
       setSessions(prev => {
         if (JSON.stringify(prev) === JSON.stringify(fresh)) return prev;
         return fresh;
       });
-    }, 5000);
-    return () => clearInterval(interval);
+    };
+    const start = () => { if (!interval) interval = setInterval(poll, 5000); };
+    const stop = () => { clearInterval(interval); interval = null; };
+    const onVisibility = () => document.hidden ? stop() : start();
+    start();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => { stop(); document.removeEventListener("visibilitychange", onVisibility); };
   }, [saveEnabled]);
 
   const activeSession = sessions.find(s => s.id === activeId);
