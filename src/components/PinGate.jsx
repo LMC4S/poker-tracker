@@ -74,6 +74,7 @@ export default function PinGate({ children }) {
         <input
           autoFocus
           type="password"
+          autoComplete="one-time-code"
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === "Enter" && submit()}

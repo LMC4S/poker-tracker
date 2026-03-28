@@ -13,6 +13,7 @@ A personal poker session tracker — built with React + Vite, persisted to Supab
 - Real-time sync — all open browsers update live when any change is made
 - Share session as a high-resolution image card (3× scale, black background, white text) — title shows session name, or falls back to the full date when the name is auto-generated
 - JSON backup and restore of all session data
+- Frequent player suggestions — when adding a player to a session, a custom dropdown (▾) shows historical players sorted by appearance count; players already in the session are excluded
 
 ---
 
@@ -230,6 +231,8 @@ Inspired by the Venetian Las Vegas Poker Room aesthetic.
 | Accent / destructive text | `#c0392b` |
 
 All inputs are set to `font-size: 16px` to prevent iOS Safari from auto-zooming when the keyboard opens.
+
+The player name field uses a non-semantic placeholder and `autoComplete="nope"` to suppress iOS Safari Contacts autofill. The PIN field uses `autoComplete="one-time-code"` to reduce (but not fully eliminate) iCloud Keychain prompts — Safari will still occasionally offer to save the password, which is a known iOS limitation with no clean workaround.
 
 ---
 

@@ -88,7 +88,7 @@ export default function ActiveView({ session, isAdmin, updateSession, setModal, 
 
       <div style={S.actions}>
         {isAdmin && <button onClick={() => setModal({ type: "addPlayer" })} style={S.actionBtn}><PlusIcon size={16}/> Add Player</button>}
-        {isAdmin && <button onClick={() => setModal({ type: "buyin" })} style={S.actionBtnAlt}>Buy-in / Rebuy</button>}
+        {isAdmin && <button onClick={() => setModal({ type: "buyin" })} style={S.actionBtnAlt}>Rebuy</button>}
         {isAdmin && <button onClick={() => setModal({ type: "cashout" })} style={S.actionBtnAlt}>Cash Out</button>}
         {session.players.length > 0 && <button onClick={() => handleShare(cardRef)} style={S.actionBtnAlt}>Share</button>}
       </div>
