@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { supabase } from "./lib/supabase";
 import { loadSessions, saveSessions } from "./storage";
 import { uid } from "./utils";
 import { S } from "./styles";
@@ -9,8 +8,9 @@ import Modal from "./components/Modal";
 import HomeView from "./views/HomeView";
 import ActiveView from "./views/ActiveView";
 import SummaryView from "./views/SummaryView";
+import ShareApp from "./ShareApp";
 
-export default function PokerTracker() {
+function AppContent({ isAdmin }) {
   const [sessions, setSessions] = useState([]);
   const [view, setView] = useState("home");
   const [activeId, setActiveId] = useState(null);
@@ -19,8 +19,9 @@ export default function PokerTracker() {
   const [modal, setModal] = useState(null);
   const [summaryId, setSummaryId] = useState(null);
 
-  const lastSaveValueRef = useRef(null);
+  const pendingSaveRef = useRef(null);
 
+  // Load sessions once after login (hash is in sessionStorage)
   useEffect(() => {
     loadSessions().then(s => {
       if (s !== null) { setSessions(s); setSaveEnabled(true); }
@@ -28,25 +29,26 @@ export default function PokerTracker() {
     });
   }, []);
 
+  // Save on change
   useEffect(() => {
-    if (saveEnabled) {
-      lastSaveValueRef.current = JSON.stringify(sessions);
-      saveSessions(sessions);
-    }
+    if (!saveEnabled) return;
+    clearTimeout(pendingSaveRef.current);
+    pendingSaveRef.current = setTimeout(() => saveSessions(sessions), 300);
   }, [sessions, saveEnabled]);
 
+  // Poll every 5s to sync across admin devices
   useEffect(() => {
-    if (!supabase) return;
-    const channel = supabase
-      .channel("poker-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "poker_data" }, (payload) => {
-        if (!payload.new?.value) return;
-        if (payload.new.value === lastSaveValueRef.current) return; // our own echo
-        setSessions(JSON.parse(payload.new.value));
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, []);
+    if (!saveEnabled) return;
+    const interval = setInterval(async () => {
+      const fresh = await loadSessions();
+      if (fresh === null) return;
+      setSessions(prev => {
+        if (JSON.stringify(prev) === JSON.stringify(fresh)) return prev;
+        return fresh;
+      });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [saveEnabled]);
 
   const activeSession = sessions.find(s => s.id === activeId);
   const summarySession = sessions.find(s => s.id === summaryId);
@@ -86,19 +88,22 @@ export default function PokerTracker() {
     else { setActiveId(id); setView("active"); }
   };
 
-  if (!loaded) return <PinGate>{() => <div style={S.loading}><div style={S.spinner}/></div>}</PinGate>;
+  if (!loaded) return <div style={S.loading}><div style={S.spinner}/></div>;
 
   return (
-    <PinGate>
-      {(isAdmin) => (
-        <div style={S.app}>
-          <Header view={view} setView={setView} activeId={activeId} isAdmin={isAdmin} />
-          {view === "home"      && <HomeView sessions={sessions} isAdmin={isAdmin} onNew={() => setModal({ type: "newSession" })} onOpen={openSession} />}
-          {view === "active"    && activeSession  && <ActiveView session={activeSession} isAdmin={isAdmin} updateSession={updateSession} setModal={setModal} onEnd={() => endSession(activeId)} />}
-          {view === "summary"   && summarySession && <SummaryView session={summarySession} isAdmin={isAdmin} onResume={() => resumeSession(summaryId)} onBack={() => setView("home")} onDelete={deleteSession} />}
-          {isAdmin && modal && <Modal modal={modal} setModal={setModal} sessions={sessions} activeSession={activeSession} updateSession={updateSession} startNewSession={startNewSession} activeId={activeId} />}
-        </div>
-      )}
-    </PinGate>
+    <div style={S.app}>
+      <Header view={view} setView={setView} activeId={activeId} isAdmin={isAdmin} />
+      {view === "home"    && <HomeView sessions={sessions} isAdmin={isAdmin} onNew={() => setModal({ type: "newSession" })} onOpen={openSession} />}
+      {view === "active"  && activeSession  && <ActiveView session={activeSession} isAdmin={isAdmin} updateSession={updateSession} setModal={setModal} onEnd={() => endSession(activeId)} />}
+      {view === "summary" && summarySession && <SummaryView session={summarySession} isAdmin={isAdmin} onResume={() => resumeSession(summaryId)} onBack={() => setView("home")} onDelete={deleteSession} />}
+      {isAdmin && modal && <Modal modal={modal} setModal={setModal} sessions={sessions} activeSession={activeSession} updateSession={updateSession} startNewSession={startNewSession} activeId={activeId} />}
+    </div>
   );
+}
+
+export default function PokerTracker() {
+  if (window.location.pathname === "/admin") {
+    return <PinGate>{(isAdmin) => <AppContent isAdmin={isAdmin} />}</PinGate>;
+  }
+  return <ShareApp />;
 }

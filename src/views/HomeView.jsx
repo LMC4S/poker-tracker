@@ -4,11 +4,12 @@ import { fmtMoney, fmt, exportJSON } from "../utils";
 import { PlusIcon } from "../components/icons";
 import SessionCard from "../components/SessionCard";
 
-export default function HomeView({ sessions, isAdmin, onNew, onOpen }) {
+export default function HomeView({ sessions, isAdmin, onNew, onOpen, precomputedStats }) {
   const activeSessions = sessions.filter(s => !s.ended);
   const recentEnded = sessions.filter(s => s.ended).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 3);
 
   const seriesStats = useMemo(() => {
+    if (precomputedStats) return precomputedStats;
     const ended = sessions.filter(s => s.ended);
     const thisYear = new Date().getFullYear();
 
@@ -46,7 +47,7 @@ export default function HomeView({ sessions, isAdmin, onNew, onOpen }) {
     }));
 
     return { sessionsThisYear, typicalBuyin, longestSession, biggestWin, biggestLoss, thisYear };
-  }, [sessions]);
+  }, [sessions, precomputedStats]);
 
   const hasSeriesData = sessions.filter(s => s.ended).length > 0;
 

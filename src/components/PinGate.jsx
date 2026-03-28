@@ -1,11 +1,19 @@
 import { useState, useEffect } from "react";
-import { SESSION_KEY, LOCKOUT_KEY, MAX_ATTEMPTS, LOCKOUT_MS, sha256, ADMIN_HASH, VIEW_HASH } from "../utils";
+import { SESSION_KEY, LOCKOUT_KEY, MAX_ATTEMPTS, LOCKOUT_MS, sha256 } from "../utils";
 import { S, F, FB } from "../styles";
 
+const ADMIN_SECRET_KEY = "poker-admin-secret";
+
 export default function PinGate({ children }) {
-  const [role, setRole] = useState(() => sessionStorage.getItem(SESSION_KEY) || null);
+  const [role, setRole] = useState(() => {
+    const r = sessionStorage.getItem(SESSION_KEY);
+    // Require secret to be present — old sessions without it must re-login
+    if (r === "admin" && !sessionStorage.getItem(ADMIN_SECRET_KEY)) return null;
+    return r || null;
+  });
   const [input, setInput] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [attempts, setAttempts] = useState(() => {
     const d = JSON.parse(localStorage.getItem(LOCKOUT_KEY) || "{}");
     if (d.until && Date.now() < d.until) return MAX_ATTEMPTS;
@@ -31,36 +39,49 @@ export default function PinGate({ children }) {
   }, [lockedUntil]);
 
   const submit = async () => {
-    if (lockedUntil) return;
-    const hash = await sha256(input);
-    if (hash === ADMIN_HASH) {
-      sessionStorage.setItem(SESSION_KEY, "admin");
-      localStorage.removeItem(LOCKOUT_KEY);
-      setRole("admin");
-    } else if (hash === VIEW_HASH) {
-      sessionStorage.setItem(SESSION_KEY, "view");
-      localStorage.removeItem(LOCKOUT_KEY);
-      setRole("view");
-    } else {
-      const newAttempts = attempts + 1;
-      setInput("");
-      if (newAttempts >= MAX_ATTEMPTS) {
-        const until = Date.now() + LOCKOUT_MS;
-        localStorage.setItem(LOCKOUT_KEY, JSON.stringify({ attempts: newAttempts, until }));
-        setLockedUntil(until);
-        setError(`Too many attempts. Locked for 15 minutes.`);
+    if (lockedUntil || submitting) return;
+    setSubmitting(true);
+    try {
+      const hash = await sha256(input);
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hash })
+      });
+
+      if (res.ok) {
+        const { secret } = await res.json();
+        sessionStorage.setItem(SESSION_KEY, "admin");
+        sessionStorage.setItem(ADMIN_SECRET_KEY, secret);
+        localStorage.removeItem(LOCKOUT_KEY);
+        setRole("admin");
       } else {
-        localStorage.setItem(LOCKOUT_KEY, JSON.stringify({ attempts: newAttempts }));
-        setAttempts(newAttempts);
-        setError(`Incorrect password. ${MAX_ATTEMPTS - newAttempts} attempt${MAX_ATTEMPTS - newAttempts !== 1 ? "s" : ""} remaining.`);
-        setTimeout(() => setError(""), 2000);
+        setInput("");
+        const newAttempts = attempts + 1;
+        if (newAttempts >= MAX_ATTEMPTS) {
+          const until = Date.now() + LOCKOUT_MS;
+          localStorage.setItem(LOCKOUT_KEY, JSON.stringify({ attempts: newAttempts, until }));
+          setLockedUntil(until);
+          setError("Too many attempts. Locked for 15 minutes.");
+        } else {
+          localStorage.setItem(LOCKOUT_KEY, JSON.stringify({ attempts: newAttempts }));
+          setAttempts(newAttempts);
+          setError(`Incorrect password. ${MAX_ATTEMPTS - newAttempts} attempt${MAX_ATTEMPTS - newAttempts !== 1 ? "s" : ""} remaining.`);
+          setTimeout(() => setError(""), 2000);
+        }
       }
+    } catch {
+      setError("Connection error. Try again.");
+      setTimeout(() => setError(""), 2000);
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  if (role) return children(role !== "view");
+  if (role) return children(true);
 
   const remaining = lockedUntil ? Math.ceil((lockedUntil - Date.now()) / 1000) : null;
+  const busy = !!lockedUntil || submitting;
 
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#fbf0df" }}>
@@ -74,30 +95,30 @@ export default function PinGate({ children }) {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === "Enter" && submit()}
-          disabled={!!lockedUntil}
+          disabled={busy}
           placeholder="Password"
           style={{
             width: "100%", padding: "14px", fontSize: 16,
             background: "#fbf0df", border: `1px solid ${error ? "#c0392b" : "#d4b898"}`,
             borderRadius: 8, color: "#2a0a08", outline: "none", boxSizing: "border-box",
-            marginBottom: 12, transition: "border-color 0.2s", opacity: lockedUntil ? 0.4 : 1,
+            marginBottom: 12, transition: "border-color 0.2s", opacity: busy ? 0.4 : 1,
             fontFamily: F, letterSpacing: "2px"
           }}
         />
         {error && <div style={{ color: "#c0392b", fontSize: 11, marginBottom: 10, lineHeight: 1.5, letterSpacing: "0.5px" }}>{error}{remaining ? ` (${remaining}s)` : ""}</div>}
         <button
           onClick={submit}
-          disabled={!!lockedUntil || !input}
+          disabled={busy || !input}
           style={{
             width: "100%", padding: "13px",
-            background: lockedUntil ? "#f0e0c4" : "#450206",
-            color: lockedUntil ? "#7a5030" : "#ffffff",
-            border: lockedUntil ? "1px solid #d4b898" : "none",
-            borderRadius: 24, fontSize: 11, fontWeight: 700, cursor: lockedUntil ? "not-allowed" : "pointer",
+            background: busy ? "#f0e0c4" : "#450206",
+            color: busy ? "#7a5030" : "#ffffff",
+            border: busy ? "1px solid #d4b898" : "none",
+            borderRadius: 24, fontSize: 11, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
             letterSpacing: "3px", textTransform: "uppercase", fontFamily: F
           }}
         >
-          {lockedUntil ? `Locked (${remaining}s)` : "Enter"}
+          {lockedUntil ? `Locked (${remaining}s)` : submitting ? "..." : "Enter"}
         </button>
       </div>
     </div>
