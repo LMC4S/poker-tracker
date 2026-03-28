@@ -1,11 +1,12 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { fmtMoney, fmt, profitColor } from "../utils";
 import { handleShare } from "../share";
-import { S } from "../styles";
+import { S, F } from "../styles";
 import { ChevronIcon } from "../components/icons";
 
-export default function SummaryView({ session, isAdmin, onResume, onBack }) {
+export default function SummaryView({ session, isAdmin, onResume, onBack, onDelete }) {
   const shareRef = useRef(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const sorted = [...session.players].sort((a, b) => {
     const pa = a.cashout !== null ? a.cashout - a.buyins.reduce((s, x) => s + x, 0) : -Infinity;
@@ -117,6 +118,29 @@ export default function SummaryView({ session, isAdmin, onResume, onBack }) {
         {isAdmin && session.ended && <button onClick={onResume} style={S.actionBtnAlt}>Reopen Session</button>}
         <button onClick={() => handleShare(shareRef)} style={S.actionBtnAlt}>Share</button>
       </div>
+
+      {isAdmin && (
+        <div style={{ marginTop: 32, paddingBottom: 8, textAlign: "center" }}>
+          {confirmDelete ? (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 11, color: "#7a5030", letterSpacing: "1px", fontFamily: F, textTransform: "uppercase" }}>Delete this session?</span>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                style={{ background: "none", border: "1px solid #d4b898", borderRadius: 20, padding: "5px 12px", fontSize: 10, fontWeight: 600, cursor: "pointer", color: "#7a5030", letterSpacing: "1px", textTransform: "uppercase", fontFamily: F }}
+              >Cancel</button>
+              <button
+                onClick={() => { onDelete(session.id); onBack(); }}
+                style={{ background: "#450206", border: "none", borderRadius: 20, padding: "5px 12px", fontSize: 10, fontWeight: 700, cursor: "pointer", color: "#ffffff", letterSpacing: "1px", textTransform: "uppercase", fontFamily: F }}
+              >Delete</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "#b89878", fontSize: 10, letterSpacing: "2px", textTransform: "uppercase", fontFamily: F, opacity: 0.6, padding: "8px 12px" }}
+            >Delete Session</button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

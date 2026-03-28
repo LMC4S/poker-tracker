@@ -1,5 +1,4 @@
 export const STORAGE_KEY = "poker-sessions-v2";
-export const SUPER_ADMIN_HASH = import.meta.env.VITE_APP_SUPER_ADMIN_HASH || "";
 export const ADMIN_HASH = import.meta.env.VITE_APP_ADMIN_HASH || "";
 export const VIEW_HASH  = import.meta.env.VITE_APP_VIEW_HASH  || "";
 export const SESSION_KEY = "poker-unlocked";

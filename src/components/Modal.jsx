@@ -8,6 +8,8 @@ export default function Modal({ modal, setModal, sessions, activeSession, update
   const [val2, setVal2] = useState(modal.type === "cashout" ? "" : "20");
   const [selectedPlayer, setSelectedPlayer] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [lastAdded, setLastAdded] = useState(null);
+  const [confirmVisible, setConfirmVisible] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 100); }, [modal.type]);
@@ -21,12 +23,17 @@ export default function Modal({ modal, setModal, sessions, activeSession, update
     const name = raw.replace(/\b\w/g, c => c.toUpperCase());
     const amount = parseFloat(val2);
     if (!name) return;
+    if (players.find(p => p.name.toLowerCase() === name.toLowerCase())) return;
     updateSession(activeId, s => {
       if (s.players.find(p => p.name.toLowerCase() === name.toLowerCase())) return s;
       s.players.push({ id: uid(), name, buyins: amount > 0 ? [amount] : [], cashout: null });
       return s;
     });
     setVal(""); setVal2("20"); setShowSuggestions(false);
+    setLastAdded(name);
+    setConfirmVisible(true);
+    setTimeout(() => setConfirmVisible(false), 1200);
+    setTimeout(() => setLastAdded(null), 1700);
   };
 
   const handleBuyin = () => {
@@ -82,7 +89,12 @@ export default function Modal({ modal, setModal, sessions, activeSession, update
             : frequentPlayers;
           return (
             <>
-              <h3 style={S.modalTitle}>Add Player</h3>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <h3 style={{ ...S.modalTitle, margin: 0 }}>Add Player</h3>
+                <div style={{ fontSize: 12, color: "#7a5030", opacity: confirmVisible ? 1 : 0, transition: "opacity 0.4s ease", whiteSpace: "nowrap" }}>
+                  ✓ {lastAdded} added
+                </div>
+              </div>
               <div style={{ position: "relative", marginBottom: 10 }}>
                 <input
                   ref={inputRef}

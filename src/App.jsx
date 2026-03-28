@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "./lib/supabase";
 import { loadSessions, saveSessions } from "./storage";
-import { uid, exportJSON } from "./utils";
+import { uid } from "./utils";
 import { S } from "./styles";
 import PinGate from "./components/PinGate";
 import Header from "./components/Header";
@@ -9,9 +9,6 @@ import Modal from "./components/Modal";
 import HomeView from "./views/HomeView";
 import ActiveView from "./views/ActiveView";
 import SummaryView from "./views/SummaryView";
-import HistoryView from "./views/HistoryView";
-import AnalyticsView from "./views/AnalyticsView";
-import PlayerSearchView from "./views/PlayerSearchView";
 
 export default function PokerTracker() {
   const [sessions, setSessions] = useState([]);
@@ -93,15 +90,12 @@ export default function PokerTracker() {
 
   return (
     <PinGate>
-      {(isAdmin, isSuperAdmin) => (
+      {(isAdmin) => (
         <div style={S.app}>
-          <Header view={view} setView={setView} activeId={activeId} hasEnded={sessions.some(s => s.ended)} isSuperAdmin={isSuperAdmin} />
-          {view === "home"      && <HomeView sessions={sessions} isAdmin={isAdmin} onNew={() => setModal({ type: "newSession" })} onOpen={openSession} onDelete={deleteSession} />}
+          <Header view={view} setView={setView} activeId={activeId} isAdmin={isAdmin} />
+          {view === "home"      && <HomeView sessions={sessions} isAdmin={isAdmin} onNew={() => setModal({ type: "newSession" })} onOpen={openSession} />}
           {view === "active"    && activeSession  && <ActiveView session={activeSession} isAdmin={isAdmin} updateSession={updateSession} setModal={setModal} onEnd={() => endSession(activeId)} />}
-          {view === "summary"   && summarySession && <SummaryView session={summarySession} isAdmin={isAdmin} onResume={() => resumeSession(summaryId)} onBack={() => setView("home")} />}
-          {view === "history"   && isSuperAdmin   && <HistoryView sessions={sessions} isAdmin={isAdmin} onOpen={(id) => { setSummaryId(id); setView("summary"); }} onDelete={deleteSession} />}
-          {view === "players"   && isSuperAdmin   && <PlayerSearchView sessions={sessions} />}
-          {view === "analytics" && <AnalyticsView sessions={sessions} isAdmin={isAdmin} isSuperAdmin={isSuperAdmin} onExport={() => exportJSON(sessions)} />}
+          {view === "summary"   && summarySession && <SummaryView session={summarySession} isAdmin={isAdmin} onResume={() => resumeSession(summaryId)} onBack={() => setView("home")} onDelete={deleteSession} />}
           {isAdmin && modal && <Modal modal={modal} setModal={setModal} sessions={sessions} activeSession={activeSession} updateSession={updateSession} startNewSession={startNewSession} activeId={activeId} />}
         </div>
       )}

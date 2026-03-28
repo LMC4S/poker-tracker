@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { SESSION_KEY, LOCKOUT_KEY, MAX_ATTEMPTS, LOCKOUT_MS, sha256, SUPER_ADMIN_HASH, ADMIN_HASH, VIEW_HASH } from "../utils";
+import { SESSION_KEY, LOCKOUT_KEY, MAX_ATTEMPTS, LOCKOUT_MS, sha256, ADMIN_HASH, VIEW_HASH } from "../utils";
 import { S, F, FB } from "../styles";
 
 export default function PinGate({ children }) {
@@ -33,11 +33,7 @@ export default function PinGate({ children }) {
   const submit = async () => {
     if (lockedUntil) return;
     const hash = await sha256(input);
-    if (SUPER_ADMIN_HASH && hash === SUPER_ADMIN_HASH) {
-      sessionStorage.setItem(SESSION_KEY, "superadmin");
-      localStorage.removeItem(LOCKOUT_KEY);
-      setRole("superadmin");
-    } else if (hash === ADMIN_HASH) {
+    if (hash === ADMIN_HASH) {
       sessionStorage.setItem(SESSION_KEY, "admin");
       localStorage.removeItem(LOCKOUT_KEY);
       setRole("admin");
@@ -62,7 +58,7 @@ export default function PinGate({ children }) {
     }
   };
 
-  if (role) return children(role !== "view", role === "superadmin");
+  if (role) return children(role !== "view");
 
   const remaining = lockedUntil ? Math.ceil((lockedUntil - Date.now()) / 1000) : null;
 

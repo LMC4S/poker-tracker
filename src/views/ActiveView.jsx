@@ -1,11 +1,12 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { fmtMoney, fmt, profitColor } from "../utils";
 import { handleShare } from "../share";
-import { S } from "../styles";
+import { S, F } from "../styles";
 import { PlusIcon, TrashIcon } from "../components/icons";
 import StatBox from "../components/StatBox";
 
 export default function ActiveView({ session, isAdmin, updateSession, setModal, onEnd }) {
+  const [confirmingId, setConfirmingId] = useState(null);
   const totalBuyins = session.players.reduce((a, p) => a + p.buyins.reduce((b, x) => b + x, 0), 0);
   const totalCashouts = session.players.filter(p => p.cashout !== null).reduce((a, p) => a + p.cashout, 0);
   const cashedOutCount = session.players.filter(p => p.cashout !== null).length;
@@ -105,6 +106,18 @@ export default function ActiveView({ session, isAdmin, updateSession, setModal, 
           {session.players.map(p => {
             const totalBuyin = p.buyins.reduce((a, x) => a + x, 0);
             const profit = p.cashout !== null ? p.cashout - totalBuyin : null;
+            const isConfirming = confirmingId === p.id;
+
+            if (isConfirming) return (
+              <div key={p.id} style={{ ...S.tableRow, borderBottom: "1px solid rgba(69,2,6,0.3)" }}>
+                <span style={{ flex: 1, fontWeight: 600, color: "#2a0a08" }}>{p.name}</span>
+                <span style={{ flex: 1, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 6 }}>
+                  <button onClick={() => setConfirmingId(null)} style={{ background: "none", border: "1px solid #d4b898", borderRadius: 20, padding: "5px 12px", fontSize: 10, fontWeight: 600, cursor: "pointer", color: "#7a5030", letterSpacing: "1px", textTransform: "uppercase", fontFamily: F }}>Cancel</button>
+                  <button onClick={() => { removePlayer(p.id); setConfirmingId(null); }} style={{ background: "#450206", border: "none", borderRadius: 20, padding: "5px 12px", fontSize: 10, fontWeight: 700, cursor: "pointer", color: "#ffffff", letterSpacing: "1px", textTransform: "uppercase", fontFamily: F }}>Delete</button>
+                </span>
+              </div>
+            );
+
             return (
               <div key={p.id} style={S.tableRow}>
                 <span style={{ flex: 2, fontWeight: 600, color: "#2a0a08" }}>{p.name}</span>
@@ -114,13 +127,13 @@ export default function ActiveView({ session, isAdmin, updateSession, setModal, 
                 </span>
                 <span style={{ flex: 1.5, textAlign: "right", color: p.cashout !== null ? "#2a0a08" : "#7a5030" }}>
                   {p.cashout !== null ? fmtMoney(p.cashout) : "—"}
-                  {isAdmin && p.cashout !== null && <button onClick={() => undoCashout(p.id)} style={{ ...S.tinyBtn, marginLeft: 4 }} title="Undo">↩</button>}
+                  {isAdmin && p.cashout !== null && <button onClick={() => undoCashout(p.id)} style={{ ...S.tinyBtn, marginLeft: 4, color: "#450206" }} title="Undo">↺</button>}
                 </span>
                 <span style={{ flex: 1.5, textAlign: "right", fontWeight: 600, color: profit !== null ? profitColor(profit) : "#707070" }}>
                   {profit !== null ? fmt(profit) : "—"}
                 </span>
                 <span style={{ flex: 0.5, textAlign: "right" }}>
-                  {isAdmin && p.cashout === null && <button onClick={() => removePlayer(p.id)} style={S.tinyBtn}><TrashIcon size={12} color="#707070"/></button>}
+                  {isAdmin && p.cashout === null && <button onClick={() => setConfirmingId(p.id)} style={S.tinyBtn}><TrashIcon size={12} color="#707070"/></button>}
                 </span>
               </div>
             );
