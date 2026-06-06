@@ -8,8 +8,6 @@
 
 Self-hosted web app for tracking buy-ins, cashouts, and balances during a home poker game. The host runs the session from a PIN-protected admin panel; players open a per-session link to follow it in the browser, read-only. All data is stored in a self-hosted Supabase database.
 
-There are no player accounts, and the full session history never leaves the server.
-
 📖 **[Developer documentation](https://lmc4s.github.io/poker-tracker/docs/)** — architecture, data model, HTTP API reference, auth flow, and security model. ([source](docs/index.html))
 
 ## How sharing works
@@ -43,8 +41,6 @@ From **Project Settings → API**, note two values:
 - **Project URL** — e.g. `https://abcdefg.supabase.co`
 - **service_role secret** — the longer JWT, kept private
 
-The browser never contacts Supabase directly, so the anon key is not required.
-
 ### Step 2 — Deploy
 
 The button below clones the repo, prompts for the keys from Step 1, and deploys to Vercel.
@@ -71,7 +67,7 @@ A custom domain can be configured under the Vercel project's **Settings → Doma
 
 ## How it works
 
-A React single-page app with two surfaces: a PIN-gated admin panel (the only writer) and a public, read-only observer view reached by an unguessable per-session token. All database access goes through Vercel serverless functions that hold the Supabase service key; the browser carries no database credential, and the single `poker_data` table denies all anonymous access.
+A React single-page app with two surfaces: a PIN-gated admin panel and a public, read-only observer view reached by a per-session token. Database access goes through Vercel serverless functions; no credentials are exposed to the browser.
 
 Full architecture, data model, HTTP API reference, auth flow, and security model are in the **[developer documentation](https://lmc4s.github.io/poker-tracker/docs/)**.
 
