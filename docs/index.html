@@ -85,7 +85,7 @@
       <div class="grp">Ops</div>
       <a href="#security">Security model</a>
       <a href="#env">Environment</a>
-      <a href="#dev">Local dev &amp; build</a>
+      <a href="#build">Build</a>
       <a href="#migrations">Migrations</a>
     </nav>
   </aside>
@@ -125,7 +125,7 @@ src/
   main.jsx             React root, Vercel analytics inject
   App.jsx              Entry; routes /admin -&gt; PinGate+AppContent, else ShareApp
   ShareApp.jsx         Observer view (/s/&lt;token&gt;), polling, two tabs
-  storage.js           Client data layer (fetch wrappers + localStorage fallback)
+  storage.js           Client data layer (fetch wrappers)
   utils.js             Keys, sha256, uid, money formatting, exportJSON
   styles.js            Shared inline style objects
   share.js             html2canvas screenshot + Web Share
@@ -180,7 +180,6 @@ vite.config.js         Dev server opens /admin</code></pre>
       <tr><td><code>poker-unlocked</code></td><td><code>SESSION_KEY</code> — "admin" once authenticated</td></tr>
       <tr><td><code>poker-admin-secret</code></td><td>API secret returned by <code>/api/auth</code>, sent as <code>x-admin-secret</code></td></tr>
       <tr><td><code>poker-lockout</code></td><td><code>LOCKOUT_KEY</code> — failed-attempt count + lockout expiry</td></tr>
-      <tr><td><code>poker-sessions-v2</code></td><td><code>STORAGE_KEY</code> — local fallback store when API is absent (dev)</td></tr>
     </table>
 
     <h2 id="schema">Database schema</h2>
@@ -248,7 +247,6 @@ vite.config.js         Dev server opens /admin</code></pre>
       <li>The secret is stored as <code>poker-admin-secret</code> and sent as <code>x-admin-secret</code> on every <code>/api/sessions</code> call. <a href="../sessions.js">sessions.js</a> compares it with <code>timingSafeEqual</code>.</li>
     </ol>
     <p><b>Lockout:</b> 5 failed attempts (<code>MAX_ATTEMPTS</code>) trigger a 15-minute lockout (<code>LOCKOUT_MS</code>), tracked client-side in <code>poker-lockout</code>.</p>
-    <div class="note">In local dev without serverless functions, <code>/api/auth</code> returns 404 (or is unreachable); PinGate detects this and grants admin access so the UI is usable against the <code>localStorage</code> fallback. This bypass only happens when the API is genuinely absent.</div>
 
     <h2 id="frontend">Frontend architecture</h2>
     <h3>Admin (<code>AppContent</code> in App.jsx)</h3>
@@ -293,18 +291,10 @@ vite.config.js         Dev server opens /admin</code></pre>
     </table>
     <div class="note">No <code>VITE_*</code> variables are needed — nothing in the browser talks to Supabase directly.</div>
 
-    <h2 id="dev">Local dev &amp; build</h2>
-<pre><code><span class="tok-c"># Full app with working API routes (recommended)</span>
-cp .env.example .env.local   <span class="tok-c"># fill in Supabase keys</span>
-npx vercel dev               <span class="tok-c"># localhost:3000, serverless functions active</span>
-
-<span class="tok-c"># UI-only (no API) — admin falls back to localStorage</span>
-npm install
-npm run dev                  <span class="tok-c"># vite on localhost:5173; api/ NOT served</span>
-
-npm run build                <span class="tok-c"># vite build -&gt; dist/</span>
-npm run hash-pwd &lt;pin&gt;        <span class="tok-c"># sha256 a PIN for manual testing</span></code></pre>
-    <p>Under plain <code>npm run dev</code>, <code>api/*</code> is not served, so <code>/s/&lt;token&gt;</code> cannot fetch real data and the admin PIN gate is bypassed against the <code>localStorage</code> store. Use <code>vercel dev</code> to exercise the real request paths.</p>
+    <h2 id="build">Build</h2>
+<pre><code>npm install
+npm run build   <span class="tok-c"># vite build -&gt; dist/</span></code></pre>
+    <p>Deployment is handled by Vercel, which runs <code>npm run build</code> for the front end and serves the <code>api/</code> directory as serverless functions. There is no standalone local run mode — every data path requires the serverless API backed by a configured Supabase project.</p>
 
     <h2 id="migrations">Migrations</h2>
     <table>

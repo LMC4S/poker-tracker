@@ -1,4 +1,3 @@
-export const STORAGE_KEY = "poker-sessions-v2";
 export const SESSION_KEY = "poker-unlocked";
 export const LOCKOUT_KEY = "poker-lockout";
 export const MAX_ATTEMPTS = 5;

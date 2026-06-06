@@ -49,13 +49,6 @@ export default function PinGate({ children }) {
         body: JSON.stringify({ hash })
       });
 
-      // API not available (local dev without serverless functions) — skip PIN gate
-      if (res.status === 404) {
-        localStorage.setItem(SESSION_KEY, "admin");
-        setRole("admin");
-        return;
-      }
-
       if (res.ok) {
         const { secret } = await res.json();
         localStorage.setItem(SESSION_KEY, "admin");
@@ -78,9 +71,8 @@ export default function PinGate({ children }) {
         }
       }
     } catch {
-      // API unreachable (local dev without serverless functions) — skip PIN gate
-      localStorage.setItem(SESSION_KEY, "admin");
-      setRole("admin");
+      setError("Could not reach the server. Try again.");
+      setTimeout(() => setError(""), 2000);
     } finally {
       setSubmitting(false);
     }
