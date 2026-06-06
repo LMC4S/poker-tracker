@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Home Game Tracker — Documentation</title>
+<title>Home Game Tracker — Developer Documentation</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Oswald:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -14,167 +14,310 @@
     --ink: #2a0a08;
     --muted: #7a5030;
     --faint: #b89878;
-    --line: #d4b898;
     --accent: #450206;
+    --line: #d4b898;
     --serif: 'Cormorant Garamond', Georgia, serif;
     --display: 'Oswald', sans-serif;
     --body: 'Inter', system-ui, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
   * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--ink);
-    font-family: var(--body);
-    line-height: 1.65;
-    font-size: 16px;
-  }
-  .wrap { max-width: 820px; margin: 0 auto; padding: 48px 24px 80px; }
-  header { text-align: center; padding: 24px 0 40px; border-bottom: 1px solid var(--line); margin-bottom: 40px; }
-  .kicker { font-family: var(--display); font-size: 13px; font-weight: 700; letter-spacing: 4px; text-transform: uppercase; color: var(--muted); }
-  h1 { font-family: var(--serif); font-size: 52px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin: 6px 0 0; }
-  .sub { color: var(--muted); font-size: 15px; margin-top: 12px; }
-  h2 { font-family: var(--display); font-size: 22px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin: 48px 0 4px; color: var(--ink); }
-  h2 + .lede { color: var(--muted); margin-top: 0; margin-bottom: 16px; }
-  h3 { font-family: var(--display); font-size: 15px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); margin: 28px 0 6px; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); line-height: 1.65; font-size: 15px; }
+  .layout { display: flex; max-width: 1100px; margin: 0 auto; }
+  aside { width: 220px; flex-shrink: 0; position: sticky; top: 0; align-self: flex-start; height: 100vh; overflow-y: auto; padding: 32px 16px; border-right: 1px solid var(--line); }
+  aside .brand { font-family: var(--serif); font-size: 22px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
+  aside .tag { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; font-family: var(--display); margin-bottom: 24px; }
+  aside nav a { display: block; color: var(--muted); text-decoration: none; font-size: 13.5px; padding: 4px 0; }
+  aside nav a:hover { color: var(--accent); }
+  aside nav .grp { font-family: var(--display); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--faint); margin: 18px 0 4px; }
+  main { flex: 1; min-width: 0; padding: 40px 40px 100px; }
+  h1 { font-family: var(--serif); font-size: 40px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin: 0 0 6px; }
+  .subtitle { color: var(--muted); font-size: 16px; margin-bottom: 8px; }
+  .badges { margin: 16px 0 8px; }
+  .badges code { background: #f0e2cc; }
+  h2 { font-family: var(--display); font-size: 20px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin: 44px 0 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+  h3 { font-family: var(--display); font-size: 14px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); margin: 26px 0 6px; }
+  p { margin: 10px 0; }
   a { color: var(--accent); }
-  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; background: #f0e2cc; padding: 2px 6px; border-radius: 4px; }
-  pre { background: var(--ink); color: #f5e9d8; padding: 16px 18px; border-radius: 10px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
-  pre code { background: none; padding: 0; color: inherit; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; margin: 16px 0; }
-  ul, ol { padding-left: 22px; }
-  li { margin: 6px 0; }
-  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
-  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  th { font-family: var(--display); font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
-  .pill { display: inline-block; font-family: var(--display); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line); border-radius: 20px; padding: 3px 10px; margin-right: 6px; }
-  .note { border-left: 3px solid var(--faint); padding: 4px 0 4px 16px; color: var(--muted); margin: 16px 0; }
-  nav.toc { font-size: 14px; }
-  nav.toc a { display: inline-block; margin: 0 14px 8px 0; color: var(--muted); text-decoration: none; }
-  nav.toc a:hover { color: var(--accent); }
-  .divider { display: flex; align-items: center; gap: 10px; margin: 12px 0; color: var(--faint); }
-  .divider .l { flex: 1; height: 1px; background: var(--line); }
-  footer { margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--line); text-align: center; color: var(--faint); font-size: 13px; }
+  code { font-family: var(--mono); font-size: 12.5px; background: #f0e2cc; padding: 1.5px 5px; border-radius: 4px; }
+  pre { background: #1c0605; color: #f5e9d8; padding: 16px 18px; border-radius: 10px; overflow-x: auto; font-size: 12.5px; line-height: 1.55; }
+  pre code { background: none; padding: 0; color: inherit; font-size: 12.5px; }
+  .tok-c { color: #b89878; } /* comment */
+  .tok-k { color: #e8a0a0; } /* keyword/method */
+  .tok-s { color: #b8d8a0; } /* string */
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13.5px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: var(--display); font-size: 11.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+  td code { white-space: nowrap; }
+  .method { font-family: var(--display); font-weight: 600; font-size: 11px; letter-spacing: 1px; padding: 2px 8px; border-radius: 4px; color: #fff; }
+  .get { background: #2d6a4f; }
+  .post { background: #9c6b1e; }
+  .note { border-left: 3px solid var(--faint); padding: 6px 0 6px 16px; color: var(--muted); margin: 14px 0; font-size: 14px; }
+  .warn { border-left: 3px solid var(--accent); }
+  ul, ol { padding-left: 22px; margin: 10px 0; }
+  li { margin: 4px 0; }
+  .endpoint { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; margin: 16px 0; }
+  .endpoint .route { font-family: var(--mono); font-size: 14px; margin-left: 8px; }
+  footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--faint); font-size: 12.5px; }
+  @media (max-width: 760px) { aside { display: none; } main { padding: 28px 20px 80px; } }
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="layout">
 
-  <header>
-    <div class="kicker">Home Game</div>
-    <h1>Tracker</h1>
-    <div class="sub">Documentation for hosts and players</div>
-  </header>
+  <aside>
+    <div class="brand">Tracker</div>
+    <div class="tag">Dev Docs</div>
+    <nav>
+      <a href="#overview">Overview</a>
+      <a href="#stack">Stack</a>
+      <a href="#structure">Project structure</a>
+      <div class="grp">Data</div>
+      <a href="#model">Data model</a>
+      <a href="#storage">Storage &amp; keys</a>
+      <a href="#schema">Database schema</a>
+      <div class="grp">Runtime</div>
+      <a href="#routing">Routing</a>
+      <a href="#api">API reference</a>
+      <a href="#auth">Auth flow</a>
+      <a href="#frontend">Frontend</a>
+      <a href="#stats">Series stats</a>
+      <div class="grp">Ops</div>
+      <a href="#security">Security model</a>
+      <a href="#env">Environment</a>
+      <a href="#dev">Local dev &amp; build</a>
+      <a href="#migrations">Migrations</a>
+    </nav>
+  </aside>
 
-  <nav class="toc">
-    <a href="#what">What it is</a>
-    <a href="#players">For players</a>
-    <a href="#hosts">For hosts</a>
-    <a href="#sharing">Sharing &amp; privacy</a>
-    <a href="#architecture">Architecture</a>
-    <a href="#security">Security</a>
-    <a href="#selfhost">Self-hosting</a>
-  </nav>
+  <main>
+    <h1>Home Game Tracker</h1>
+    <div class="subtitle">Self-hosted poker home-game tracker. React SPA + Vercel serverless functions + Supabase Postgres.</div>
+    <div class="badges">
+      <code>MIT</code> &nbsp; <code>React 18</code> &nbsp; <code>Vite 5</code> &nbsp; <code>Node serverless</code> &nbsp; <code>Postgres</code>
+    </div>
+    <p>Repo: <a href="https://github.com/LMC4S/poker-tracker">github.com/LMC4S/poker-tracker</a>. This document covers the architecture, data model, HTTP API, and operational details for contributors. For an end-to-end install walkthrough, see the <a href="../README.md">README</a>.</p>
 
-  <h2 id="what">What it is</h2>
-  <p class="lede">A tool for running the money side of a home poker game.</p>
-  <p>
-    The host tracks buy-ins, rebuys, and cashouts during a session and uses the running totals to settle up afterward.
-    Players who have a session's link can watch that session in their browser, read-only. There are no player accounts,
-    and the data lives in the host's own database.
-  </p>
-
-  <h2 id="players">For players</h2>
-  <p class="lede">You were sent a link. Here is what you can do with it.</p>
-  <div class="card">
-    <p>A session link looks like <code>https://your-app.vercel.app/s/&lt;token&gt;</code>. Open it in any browser. No login, no install.</p>
-    <h3>Two tabs</h3>
+    <h2 id="overview">Overview</h2>
+    <p>A single-page React app with two surfaces, distinguished by URL path:</p>
     <ul>
-      <li><span class="pill">Session</span> The game you were linked to: each player's buy-in, cashout, and net. Updates every few seconds while the game is live, and stays viewable with final standings after it ends.</li>
-      <li><span class="pill">Home</span> Series stats across all of the host's games: sessions played this year, typical buy-in, longest session, biggest win and loss. These are aggregate numbers only.</li>
+      <li><b>Admin</b> (<code>/admin</code>) — PIN-gated. Full read/write over all sessions. This is the only writer.</li>
+      <li><b>Observer</b> (<code>/s/&lt;token&gt;</code>) — public, read-only view of one session by unguessable token, plus aggregate series stats.</li>
     </ul>
-    <div class="note">You only ever see the one session you were linked to. The link does not let you browse other games, and there is no player-by-player history.</div>
-  </div>
+    <p>The browser never holds a database credential. Every read and write is brokered by a Vercel serverless function that uses the Supabase <code>service_role</code> key. All session data is stored as a single JSON blob in one Postgres row; the functions are thin CRUD/lookup wrappers over it.</p>
 
-  <h2 id="hosts">For hosts</h2>
-  <p class="lede">The admin panel is where you run the session.</p>
-  <p>Go to <code>/admin</code> and enter your PIN. From there:</p>
-  <table>
-    <tr><th>Action</th><th>What it does</th></tr>
-    <tr><td>New Session</td><td>Starts a game. Each session gets its own share link automatically.</td></tr>
-    <tr><td>Add Player</td><td>Adds someone to the table with their first buy-in. Names autocomplete from past games.</td></tr>
-    <tr><td>Rebuy</td><td>Adds another buy-in to a player already at the table.</td></tr>
-    <tr><td>Cash Out</td><td>Records what a player leaves with. Their net is buy-ins minus cashout. Use the undo arrow to correct a mistake.</td></tr>
-    <tr><td>End Session</td><td>Closes the game and shows the final summary. You can reopen it if needed.</td></tr>
-    <tr><td>Copy Link</td><td>Copies that session's share link to send to the group.</td></tr>
-    <tr><td>Share</td><td>Generates a screenshot summary card ranked by net, to post in a group chat.</td></tr>
-    <tr><td>Backup Data</td><td>Downloads all sessions as a JSON file.</td></tr>
-  </table>
-  <div class="note">When the table balances (total cashouts equal total buy-ins), the summary shows a check instead of a number. If it does not balance, the difference is shown so you can find the missing count.</div>
-
-  <h2 id="sharing">Sharing &amp; privacy</h2>
-  <p class="lede">Links are per-session and unguessable.</p>
-  <ul>
-    <li>Every session has a random UUID token. The link is the only way in; tokens cannot be guessed or listed.</li>
-    <li>The root URL with no token (<code>/</code>) shows only a prompt to use a shared link. There is no public list of games.</li>
-    <li>A link keeps working after a session ends, showing the final standings.</li>
-    <li>Anyone who has a link can view that session, so share links the same way you would share the numbers themselves.</li>
-  </ul>
-
-  <h2 id="architecture">Architecture</h2>
-  <p class="lede">All database access runs through serverless functions. The browser holds no database credential.</p>
-  <pre><code>   Admin (/admin)                 Observer (/s/&lt;token&gt;)
-        |                                 |
-        v                                 v
-  /api/auth                         /api/session?token=...
-  /api/sessions                            |
-        |   service key                    |  service key
-        v                                  v
-  +------------------ poker_data ---------------------+
-  |  full history  (RLS: deny all anonymous access)   |
-  +---------------------------------------------------+</code></pre>
-  <table>
-    <tr><th></th><th>Observer</th><th>Admin</th></tr>
-    <tr><td>Access</td><td>Holds a session token</td><td>PIN required</td></tr>
-    <tr><td>Sees</td><td>One session + aggregate stats</td><td>All sessions, full history</td></tr>
-    <tr><td>Source</td><td><code>/api/session?token=</code></td><td><code>/api/sessions</code></td></tr>
-    <tr><td>Updates</td><td>5-second polling</td><td>5-second polling</td></tr>
-    <tr><td>Writes</td><td>None</td><td><code>x-admin-secret</code> header</td></tr>
-  </table>
-
-  <h2 id="security">Security</h2>
-  <p class="lede">One table, no anonymous database access, every path gated server-side.</p>
-  <ul>
-    <li>All data lives in a single <code>poker_data</code> table whose row-level-security policy denies all anonymous access.</li>
-    <li>No database credential ships in the browser bundle. Reads and writes go through serverless functions using the service key.</li>
-    <li>Admin routes require an <code>x-admin-secret</code> header, checked with a constant-time comparison.</li>
-    <li>The observer route returns only the one session matching a token plus aggregate stats. Sessions cannot be enumerated.</li>
-    <li>The admin PIN is SHA-256 hashed in the browser before being sent.</li>
-  </ul>
-
-  <h2 id="selfhost">Self-hosting</h2>
-  <p class="lede">Runs on the Vercel and Supabase free tiers.</p>
-  <div class="card">
-    <h3>Database</h3>
-    <p>Create a Supabase project and run <code>supabase/migrations/20260101000000_init.sql</code> in the SQL Editor. Copy the Project URL and the service_role secret from Project Settings &rarr; API.</p>
-    <h3>Deploy</h3>
-    <p>Deploy the repo to Vercel and set four environment variables:</p>
+    <h2 id="stack">Stack</h2>
     <table>
-      <tr><th>Variable</th><th>Value</th></tr>
-      <tr><td><code>SUPABASE_URL</code></td><td>Supabase Project URL</td></tr>
-      <tr><td><code>SUPABASE_SERVICE_KEY</code></td><td>service_role secret</td></tr>
-      <tr><td><code>ADMIN_PIN</code></td><td>Your admin password</td></tr>
-      <tr><td><code>ADMIN_API_SECRET</code></td><td><code>openssl rand -hex 32</code></td></tr>
+      <tr><th>Layer</th><th>Tech</th><th>Notes</th></tr>
+      <tr><td>UI</td><td>React 18, Vite 5</td><td>Inline-style components, no CSS framework</td></tr>
+      <tr><td>API</td><td>Vercel Serverless Functions</td><td>Node, zero-config <code>api/</code> directory</td></tr>
+      <tr><td>DB</td><td>Supabase (Postgres)</td><td>Accessed only via <code>@supabase/supabase-js</code> server-side</td></tr>
+      <tr><td>Screenshot</td><td>html2canvas + Web Share API</td><td>Client-side summary card export</td></tr>
+      <tr><td>Analytics</td><td>@vercel/analytics</td><td>Injected in <code>main.jsx</code></td></tr>
     </table>
-    <div class="note">See the <a href="../README.md">README</a> for the full step-by-step and local-development setup.</div>
-  </div>
 
-  <div class="divider"><span>&#10087;</span><span class="l"></span><span>&#10089;</span></div>
+    <h2 id="structure">Project structure</h2>
+<pre><code>api/
+  auth.js              POST  PIN hash -&gt; admin secret
+  sessions.js          GET/POST  admin read/write of full history
+  session.js           GET   public read of one session by ?token=
+src/
+  main.jsx             React root, Vercel analytics inject
+  App.jsx              Entry; routes /admin -&gt; PinGate+AppContent, else ShareApp
+  ShareApp.jsx         Observer view (/s/&lt;token&gt;), polling, two tabs
+  storage.js           Client data layer (fetch wrappers + localStorage fallback)
+  utils.js             Keys, sha256, uid, money formatting, exportJSON
+  styles.js            Shared inline style objects
+  share.js             html2canvas screenshot + Web Share
+  components/
+    PinGate.jsx        Admin auth gate with lockout
+    Header.jsx         Title + tab nav (showNav toggle)
+    Modal.jsx          Add player / rebuy / cashout dialogs
+    SessionCard.jsx    Session list item (admin home)
+    StatBox.jsx        Stat tile
+    CopyLinkButton.jsx Copies /s/&lt;token&gt; to clipboard
+    icons.jsx          Inline SVG icons
+  views/
+    HomeView.jsx       Series stats + session lists (seriesOnly flag)
+    ActiveView.jsx     Live session table + admin actions
+    SummaryView.jsx    Ended session summary + delete/reopen/share
+supabase/migrations/   SQL (init + per-session-share)
+vercel.json            SPA rewrites
+vite.config.js         Dev server opens /admin</code></pre>
 
-  <footer>
-    Home Game Tracker &middot; MIT License &middot; built on React, Vercel, and Supabase
-  </footer>
+    <h2 id="model">Data model</h2>
+    <p>There is one entity, <code>Session</code>, stored in an array. No relational schema — the whole array is serialized to a single Postgres row.</p>
+<pre><code><span class="tok-c">// Session</span>
+{
+  id: <span class="tok-s">string</span>,           <span class="tok-c">// uid(): base36 timestamp + random</span>
+  name: <span class="tok-s">string</span>,         <span class="tok-c">// e.g. "Session 27" or custom</span>
+  date: <span class="tok-s">string</span>,         <span class="tok-c">// ISO 8601, session start</span>
+  endDate?: <span class="tok-s">string</span>,     <span class="tok-c">// ISO 8601, set on End Session</span>
+  ended: <span class="tok-k">boolean</span>,
+  shareToken: <span class="tok-s">string</span>,   <span class="tok-c">// crypto.randomUUID(), the public link key</span>
+  players: Player[]
+}
 
+<span class="tok-c">// Player</span>
+{
+  id: <span class="tok-s">string</span>,           <span class="tok-c">// uid()</span>
+  name: <span class="tok-s">string</span>,
+  buyins: <span class="tok-k">number</span>[],      <span class="tok-c">// each rebuy appended; total = sum</span>
+  cashout: <span class="tok-k">number</span> | <span class="tok-k">null</span> <span class="tok-c">// null until cashed out</span>
+}</code></pre>
+    <p><b>Derived values</b> (computed, never stored): a player's net is <code>cashout − sum(buyins)</code>. A session balances when total cashouts equal total buy-ins. <code>shareToken</code> is assigned on session creation and backfilled onto any token-less session when the admin app loads.</p>
+
+    <h2 id="storage">Storage &amp; keys</h2>
+    <h3>Server (Postgres)</h3>
+    <p>One table, one row. The functions read/write the row keyed by a constant:</p>
+    <table>
+      <tr><th>Key constant</th><th>Value</th></tr>
+      <tr><td><code>DATA_KEY = "poker-sessions-v2"</code></td><td>row in <code>poker_data.value</code> holding <code>JSON.stringify(Session[])</code></td></tr>
+    </table>
+    <h3>Client (localStorage)</h3>
+    <table>
+      <tr><th>Key</th><th>Purpose</th></tr>
+      <tr><td><code>poker-unlocked</code></td><td><code>SESSION_KEY</code> — "admin" once authenticated</td></tr>
+      <tr><td><code>poker-admin-secret</code></td><td>API secret returned by <code>/api/auth</code>, sent as <code>x-admin-secret</code></td></tr>
+      <tr><td><code>poker-lockout</code></td><td><code>LOCKOUT_KEY</code> — failed-attempt count + lockout expiry</td></tr>
+      <tr><td><code>poker-sessions-v2</code></td><td><code>STORAGE_KEY</code> — local fallback store when API is absent (dev)</td></tr>
+    </table>
+
+    <h2 id="schema">Database schema</h2>
+<pre><code><span class="tok-k">create table</span> poker_data (
+  key        text <span class="tok-k">primary key</span>,
+  value      text <span class="tok-k">not null</span>,   <span class="tok-c">-- JSON.stringify(Session[])</span>
+  updated_at text
+);
+
+<span class="tok-k">alter table</span> poker_data <span class="tok-k">enable row level security</span>;
+
+<span class="tok-c">-- No anon policy =&gt; all anonymous access denied. Only the</span>
+<span class="tok-c">-- service_role key (used server-side) can read or write.</span>
+<span class="tok-k">create policy</span> <span class="tok-s">"deny all anon"</span> <span class="tok-k">on</span> poker_data
+  <span class="tok-k">for all to</span> anon <span class="tok-k">using</span> (<span class="tok-k">false</span>);</code></pre>
+
+    <h2 id="routing">Routing</h2>
+    <p>Routing is client-side. <a href="../App.jsx">App.jsx</a> branches on <code>window.location.pathname</code>:</p>
+    <ul>
+      <li><code>/admin</code> &rarr; <code>&lt;PinGate&gt;</code> wrapping <code>&lt;AppContent&gt;</code></li>
+      <li>anything else &rarr; <code>&lt;ShareApp&gt;</code>, which parses <code>/s/&lt;token&gt;</code> with <code>/^\/s\/(.+)$/</code>. No token &rarr; the "use a shared link" prompt.</li>
+    </ul>
+    <p><a href="../vercel.json">vercel.json</a> makes the SPA work on hard navigation: serverless functions resolve first, then every other path falls back to <code>index.html</code>.</p>
+<pre><code>{
+  <span class="tok-s">"rewrites"</span>: [
+    { <span class="tok-s">"source"</span>: <span class="tok-s">"/api/:path*"</span>, <span class="tok-s">"destination"</span>: <span class="tok-s">"/api/:path*"</span> },
+    { <span class="tok-s">"source"</span>: <span class="tok-s">"/(.*)"</span>,      <span class="tok-s">"destination"</span>: <span class="tok-s">"/index.html"</span> }
+  ]
+}</code></pre>
+    <div class="note warn"><b>Gotcha:</b> nested dynamic function files (e.g. <code>api/session/[token].js</code>) were not reliably registered on this setup — requests fell through to the <code>index.html</code> rewrite and returned HTML. Public reads therefore use a top-level <code>api/session.js</code> with a <code>?token=</code> query param. Prefer top-level function files with query params over nested dynamic routes.</div>
+
+    <h2 id="api">API reference</h2>
+    <p>Three functions under <code>api/</code>. All responses are JSON. Admin endpoints require the <code>x-admin-secret</code> header (value obtained from <code>/api/auth</code>); it is compared server-side with <code>crypto.timingSafeEqual</code>.</p>
+
+    <div class="endpoint">
+      <span class="method post">POST</span><span class="route">/api/auth</span>
+      <p>Exchanges a hashed PIN for the API secret.</p>
+      <p><b>Body:</b> <code>{ "hash": "&lt;sha256(pin) hex&gt;" }</code></p>
+      <p><b>Responses:</b> <code>200 { "secret": "&lt;ADMIN_API_SECRET&gt;" }</code> · <code>401</code> wrong PIN · <code>400</code> bad body · <code>405</code> non-POST · <code>500</code> server not configured</p>
+    </div>
+
+    <div class="endpoint">
+      <span class="method get">GET</span><span class="route">/api/sessions</span>
+      <p>Returns the full session array. <b>Header:</b> <code>x-admin-secret</code>.</p>
+      <p><b>Responses:</b> <code>200 Session[]</code> · <code>401</code> bad/missing secret · <code>500</code></p>
+    </div>
+
+    <div class="endpoint">
+      <span class="method post">POST</span><span class="route">/api/sessions</span>
+      <p>Overwrites the full session array (the client sends the whole array on each save). <b>Header:</b> <code>x-admin-secret</code>. <b>Body:</b> <code>Session[]</code>.</p>
+      <p><b>Responses:</b> <code>200 { "ok": true }</code> · <code>401</code> · <code>400</code> bad body · <code>500</code></p>
+    </div>
+
+    <div class="endpoint">
+      <span class="method get">GET</span><span class="route">/api/session?token=&lt;uuid&gt;</span>
+      <p>Public, unauthenticated. Looks up one session by <code>shareToken</code> and returns it with computed aggregate stats. No way to list or enumerate sessions.</p>
+      <p><b>Responses:</b> <code>200 { session: Session, seriesStats: {...} }</code> · <code>404</code> unknown token · <code>400</code> missing token · <code>405</code> non-GET · <code>500</code></p>
+    </div>
+
+    <h2 id="auth">Auth flow</h2>
+    <p>The PIN is never sent in clear text, and the API secret is never embedded in the bundle — it is fetched at login and held in <code>localStorage</code>.</p>
+    <ol>
+      <li><a href="../components/PinGate.jsx">PinGate</a> computes <code>sha256(pin)</code> in the browser and POSTs it to <code>/api/auth</code>.</li>
+      <li><a href="../auth.js">auth.js</a> hashes <code>ADMIN_PIN</code> server-side and compares with <code>timingSafeEqual</code>. On match it returns <code>ADMIN_API_SECRET</code>.</li>
+      <li>The secret is stored as <code>poker-admin-secret</code> and sent as <code>x-admin-secret</code> on every <code>/api/sessions</code> call. <a href="../sessions.js">sessions.js</a> compares it with <code>timingSafeEqual</code>.</li>
+    </ol>
+    <p><b>Lockout:</b> 5 failed attempts (<code>MAX_ATTEMPTS</code>) trigger a 15-minute lockout (<code>LOCKOUT_MS</code>), tracked client-side in <code>poker-lockout</code>.</p>
+    <div class="note">In local dev without serverless functions, <code>/api/auth</code> returns 404 (or is unreachable); PinGate detects this and grants admin access so the UI is usable against the <code>localStorage</code> fallback. This bypass only happens when the API is genuinely absent.</div>
+
+    <h2 id="frontend">Frontend architecture</h2>
+    <h3>Admin (<code>AppContent</code> in App.jsx)</h3>
+    <ul>
+      <li><b>Load:</b> on mount, fetch sessions; backfill <code>shareToken</code> on any session missing one.</li>
+      <li><b>Save:</b> writes are debounced 300ms; the whole array is POSTed on any change.</li>
+      <li><b>Sync:</b> 5-second polling keeps multiple admin devices in sync. Polling is skipped while a save is pending or in flight (avoids clobbering local edits) and pauses when the tab is hidden.</li>
+      <li><b>Views:</b> <code>home</code> (HomeView), <code>active</code> (ActiveView), <code>summary</code> (SummaryView). Mutations go through a single <code>updateSession(id, fn)</code> reducer.</li>
+    </ul>
+    <h3>Observer (ShareApp.jsx)</h3>
+    <ul>
+      <li>Parses the token from the URL once on mount; fetches <code>/api/session?token=</code> and polls every 5s (paused when hidden).</li>
+      <li>Two tabs via Header: <b>Session</b> (default — renders ActiveView or SummaryView depending on <code>ended</code>) and <b>Home</b> (HomeView with <code>seriesOnly</code> and <code>precomputedStats</code>).</li>
+      <li>All write handlers are no-ops; <code>isAdmin=false</code> hides every mutating control.</li>
+      <li>States: <code>loading</code>, <code>ok</code>, <code>notfound</code> (invalid/expired link), <code>nolink</code> (root prompt).</li>
+    </ul>
+
+    <h2 id="stats">Series stats</h2>
+    <p>Aggregate stats are computed two ways from the same logic, so observers never receive other sessions' raw data:</p>
+    <ul>
+      <li><b>Admin:</b> HomeView computes them client-side from the full array it already holds.</li>
+      <li><b>Observer:</b> <code>computeSeriesStats()</code> in <a href="../session.js">session.js</a> runs server-side over the full history and returns only the aggregate numbers alongside the single session.</li>
+    </ul>
+    <p>Fields: <code>sessionsThisYear</code>, <code>typicalBuyin</code> (median buy-in), <code>longestSession</code> (h/m from date→endDate), <code>biggestWin</code>, <code>biggestLoss</code>, <code>thisYear</code>. All derived only from <code>ended</code> sessions.</p>
+
+    <h2 id="security">Security model</h2>
+    <ul>
+      <li><b>No client DB credential.</b> The bundle contains no Supabase key. <code>poker_data</code> RLS denies all anon access; only the server-side <code>service_role</code> key can touch it.</li>
+      <li><b>Single writer.</b> The only write path is <code>POST /api/sessions</code>, gated by <code>x-admin-secret</code>. Observers have no write endpoint at all.</li>
+      <li><b>No enumeration.</b> <code>GET /api/session</code> returns exactly one session matched by token; there is no list endpoint reachable without the admin secret.</li>
+      <li><b>Constant-time comparisons</b> for both the PIN hash and the API secret (<code>timingSafeEqual</code>).</li>
+      <li><b>Token capability.</b> A <code>shareToken</code> is a bearer capability: anyone with the link can read that one session. Tokens are <code>crypto.randomUUID()</code> (122 bits), not guessable or enumerable.</li>
+    </ul>
+
+    <h2 id="env">Environment variables</h2>
+    <table>
+      <tr><th>Variable</th><th>Used by</th><th>Notes</th></tr>
+      <tr><td><code>SUPABASE_URL</code></td><td>all functions</td><td>Supabase project URL</td></tr>
+      <tr><td><code>SUPABASE_SERVICE_KEY</code></td><td>all functions</td><td><code>service_role</code> secret. Server-only.</td></tr>
+      <tr><td><code>ADMIN_PIN</code></td><td>auth.js</td><td>Admin password (hashed for comparison)</td></tr>
+      <tr><td><code>ADMIN_API_SECRET</code></td><td>auth.js, sessions.js</td><td>Returned on login; sent as <code>x-admin-secret</code>. Generate with <code>openssl rand -hex 32</code>.</td></tr>
+    </table>
+    <div class="note">No <code>VITE_*</code> variables are needed — nothing in the browser talks to Supabase directly.</div>
+
+    <h2 id="dev">Local dev &amp; build</h2>
+<pre><code><span class="tok-c"># Full app with working API routes (recommended)</span>
+cp .env.example .env.local   <span class="tok-c"># fill in Supabase keys</span>
+npx vercel dev               <span class="tok-c"># localhost:3000, serverless functions active</span>
+
+<span class="tok-c"># UI-only (no API) — admin falls back to localStorage</span>
+npm install
+npm run dev                  <span class="tok-c"># vite on localhost:5173; api/ NOT served</span>
+
+npm run build                <span class="tok-c"># vite build -&gt; dist/</span>
+npm run hash-pwd &lt;pin&gt;        <span class="tok-c"># sha256 a PIN for manual testing</span></code></pre>
+    <p>Under plain <code>npm run dev</code>, <code>api/*</code> is not served, so <code>/s/&lt;token&gt;</code> cannot fetch real data and the admin PIN gate is bypassed against the <code>localStorage</code> store. Use <code>vercel dev</code> to exercise the real request paths.</p>
+
+    <h2 id="migrations">Migrations</h2>
+    <table>
+      <tr><th>File</th><th>Purpose</th></tr>
+      <tr><td><code>20260101000000_init.sql</code></td><td>Creates <code>poker_data</code> + the deny-all-anon RLS policy.</td></tr>
+      <tr><td><code>20260606000000_per_session_share.sql</code></td><td>Drops the legacy <code>poker_public</code> snapshot table (now unused). No-op on fresh installs.</td></tr>
+    </table>
+    <p>Run migrations in the Supabase SQL Editor in filename order. The legacy <code>poker_public</code> table previously held a derived public snapshot read by an anon key; the per-session-share model replaced it with the service-key <code>/api/session</code> endpoint, so it is removed.</p>
+
+    <footer>
+      Home Game Tracker · MIT · <a href="https://github.com/LMC4S/poker-tracker">LMC4S/poker-tracker</a> · React · Vercel · Supabase
+    </footer>
+  </main>
 </div>
 </body>
 </html>
