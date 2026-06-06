@@ -6,74 +6,74 @@
   <a href="https://supabase.com"><img src="https://img.shields.io/badge/Database-Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase"></a>
 </p>
 
-Self-hosted web app for home game hosts to track buy-ins, cashouts, and balances during a session. The host runs the session; players who have the link for a session can follow it in their browser, read-only. Data stays in your own Supabase database.
+Self-hosted web app for tracking buy-ins, cashouts, and balances during a home poker game. The host runs the session from a PIN-protected admin panel; players open a per-session link to follow it in the browser, read-only. All data is stored in a self-hosted Supabase database.
 
-No player accounts. Admin access is PIN-protected, and the full session history never leaves the server.
+There are no player accounts, and the full session history never leaves the server.
 
 📖 **[Developer documentation](https://lmc4s.github.io/poker-tracker/docs/)** — architecture, data model, HTTP API reference, auth flow, and security model. ([source](docs/index.html))
 
 ## How sharing works
 
-Each session has its own share link: `https://your-app.vercel.app/s/<token>`. The token is a random UUID, so links are not guessable and cannot be enumerated.
+Each session has its own share link of the form `https://<app>.vercel.app/s/<token>`. The token is a random UUID, so links are neither guessable nor enumerable.
 
-- The host copies a session's link and sends it to the group.
-- Anyone with the link sees that one session, read-only, updating every few seconds. It keeps working after the session ends (it shows the final standings).
+- The host copies a session's link and sends it to the players.
+- Anyone holding the link sees that single session, read-only, refreshed every few seconds. The link remains valid after the session ends and shows the final standings.
 - The shared view has two tabs: **Session** (the linked game) and **Home** (series stats across all games — aggregate numbers only, no per-player history).
-- The root URL (`/` with no token) shows nothing but a prompt to use a shared link. There is no public listing of sessions.
+- The root URL (`/`, no token) shows only a prompt to open a shared link. No session list is exposed publicly.
 
 ## Features
 
-- Per-session share links — send a link, the group follows that session live in any phone browser, no app install
-- Buy-ins, rebuys, cashouts, undo cashout, with player-name autocomplete from past games
+- Per-session share links — players follow a session live in any mobile browser, with no app install
+- Buy-ins, rebuys, cashouts, and undo, with player-name autocomplete from past games
 - Series stats across all games — sessions played, typical buy-in, longest session, biggest swing
 - Screenshot summary card ranked by net profit, shared via the Web Share API or saved as PNG
 - One-click JSON backup of all data
-- Mobile-first, built for phones at the table
+- Mobile-first layout
 - Runs on the Vercel and Supabase free tiers
 
 ## Install
 
-You need free accounts on [Vercel](https://vercel.com) and [Supabase](https://supabase.com).
+Requires free accounts on [Vercel](https://vercel.com) and [Supabase](https://supabase.com).
 
-### Step 1 — Set up the database
+### Step 1 — Database
 
-Create a new project at [supabase.com/dashboard](https://supabase.com/dashboard). When it is ready, open the **SQL Editor** and run the contents of [`supabase/migrations/20260101000000_init.sql`](supabase/migrations/20260101000000_init.sql). This creates the `poker_data` table and the row-level-security policy that blocks all anonymous access to it.
+Create a Supabase project. In the **SQL Editor**, run [`supabase/migrations/20260101000000_init.sql`](supabase/migrations/20260101000000_init.sql), which creates the `poker_data` table and the row-level-security policy that denies all anonymous access.
 
-Then go to **Project Settings → API** and copy:
-- **Project URL** — looks like `https://abcdefg.supabase.co`
-- **service_role secret** — the longer JWT (click Reveal). Keep this private.
+From **Project Settings → API**, note two values:
+- **Project URL** — e.g. `https://abcdefg.supabase.co`
+- **service_role secret** — the longer JWT, kept private
 
-The browser never talks to Supabase directly, so you do not need the anon key.
+The browser never contacts Supabase directly, so the anon key is not required.
 
-### Step 2 — Deploy to Vercel
+### Step 2 — Deploy
 
-Click the button below. It clones the repo to your GitHub, prompts you for the keys from Step 1, and deploys.
+The button below clones the repo, prompts for the keys from Step 1, and deploys to Vercel.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/LMC4S/poker-tracker&project-name=poker-tracker&repository-name=poker-tracker&env=SUPABASE_URL,SUPABASE_SERVICE_KEY,ADMIN_PIN,ADMIN_API_SECRET&envDescription=SUPABASE_URL%3A%20your%20Supabase%20Project%20URL.%20SUPABASE_SERVICE_KEY%3A%20service_role%20secret%20from%20Supabase.%20ADMIN_PIN%3A%20your%20admin%20password.%20ADMIN_API_SECRET%3A%20run%20openssl%20rand%20-hex%2032%20to%20generate.)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/LMC4S/poker-tracker&project-name=poker-tracker&repository-name=poker-tracker&env=SUPABASE_URL,SUPABASE_SERVICE_KEY,ADMIN_PIN,ADMIN_API_SECRET&envDescription=SUPABASE_URL%3A%20Supabase%20Project%20URL.%20SUPABASE_SERVICE_KEY%3A%20service_role%20secret%20from%20Supabase.%20ADMIN_PIN%3A%20admin%20password.%20ADMIN_API_SECRET%3A%20run%20openssl%20rand%20-hex%2032%20to%20generate.)
 
-Environment variables:
+Required environment variables:
 
-| Variable | Where to get it |
+| Variable | Source |
 |---|---|
 | `SUPABASE_URL` | Supabase → Project Settings → API → Project URL |
 | `SUPABASE_SERVICE_KEY` | Supabase → Project Settings → API → service_role secret |
-| `ADMIN_PIN` | Pick anything. This is your admin password |
-| `ADMIN_API_SECRET` | Run `openssl rand -hex 32` in your terminal |
+| `ADMIN_PIN` | Admin password (any value) |
+| `ADMIN_API_SECRET` | Generated with `openssl rand -hex 32` |
 
-### Step 3 — Run a game
+### Step 3 — Use
 
-Vercel gives you a URL like `https://your-app.vercel.app`.
+Vercel assigns a URL such as `https://<app>.vercel.app`.
 
-- **Host:** go to `/admin`, enter your PIN, create a session.
-- **Group:** open a session, tap **Copy Link**, and send it to them. Each session has its own link.
+- **Admin:** open `/admin`, enter the PIN, and create a session.
+- **Players:** the host opens a session, taps **Copy Link**, and sends it. Each session has its own link.
 
-Custom domain: Vercel project → **Settings → Domains**.
+A custom domain can be configured under the Vercel project's **Settings → Domains**.
 
 ## How it works
 
-A React single-page app with two surfaces: a PIN-gated admin panel (the only writer) and a public, read-only observer view reached by an unguessable per-session token. All database access goes through Vercel serverless functions that hold the Supabase service key — the browser never has a database credential, and the single `poker_data` table denies all anonymous access.
+A React single-page app with two surfaces: a PIN-gated admin panel (the only writer) and a public, read-only observer view reached by an unguessable per-session token. All database access goes through Vercel serverless functions that hold the Supabase service key; the browser carries no database credential, and the single `poker_data` table denies all anonymous access.
 
-For the architecture, data model, HTTP API reference, auth flow, and security model, see the **[developer documentation](https://lmc4s.github.io/poker-tracker/docs/)**.
+Full architecture, data model, HTTP API reference, auth flow, and security model are in the **[developer documentation](https://lmc4s.github.io/poker-tracker/docs/)**.
 
 ## License
 
