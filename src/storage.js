@@ -1,7 +1,4 @@
-import { supabase } from "./lib/supabase";
 import { STORAGE_KEY } from "./utils";
-
-const PUBLIC_KEY = "poker-public-v1";
 
 function getAdminHash() {
   return localStorage.getItem("poker-admin-secret");
@@ -44,18 +41,16 @@ export async function saveSessions(sessions) {
   }
 }
 
-export async function loadPublicSnapshot() {
+// Public read of a single shared session by its token. Returns the session
+// object, the string "notfound" for an invalid/expired link, or null on error.
+export async function loadSharedSession(token) {
   try {
-    if (!supabase) return null;
-    const { data, error } = await supabase
-      .from("poker_public")
-      .select("value")
-      .eq("key", PUBLIC_KEY)
-      .single();
-    if (error && error.code !== "PGRST116") throw error;
-    return data ? JSON.parse(data.value) : null;
+    const res = await fetch(`/api/session/${encodeURIComponent(token)}`);
+    if (res.status === 404) return "notfound";
+    if (!res.ok) throw new Error(`Load failed: ${res.status}`);
+    return await res.json();
   } catch (e) {
-    console.error("Public snapshot load failed:", e);
+    console.error("Shared session load failed:", e);
     return null;
   }
 }
