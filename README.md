@@ -10,7 +10,7 @@ Self-hosted web app for home game hosts to track buy-ins, cashouts, and balances
 
 No player accounts. Admin access is PIN-protected, and the full session history never leaves the server. See [Security](#security) for details.
 
-📖 **[Developer documentation](https://htmlpreview.github.io/?https://github.com/LMC4S/poker-tracker/blob/main/docs/index.html)** — architecture, data model, HTTP API reference, auth flow, and security model. ([source](docs/index.html))
+📖 **[Developer documentation](https://lmc4s.github.io/poker-tracker/docs/)** — architecture, data model, HTTP API reference, auth flow, and security model. ([source](docs/index.html))
 
 ## How sharing works
 
