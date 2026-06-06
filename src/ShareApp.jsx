@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { loadSharedSession } from "./storage";
 import { S, FB } from "./styles";
 import Header from "./components/Header";
+import HomeView from "./views/HomeView";
 import ActiveView from "./views/ActiveView";
 import SummaryView from "./views/SummaryView";
 
@@ -35,8 +36,11 @@ function Spinner() {
 export default function ShareApp() {
   const token = parseToken();
   const [session, setSession] = useState(null);
+  const [seriesStats, setSeriesStats] = useState(null);
   // loading | ok | notfound | nolink
   const [status, setStatus] = useState(token ? "loading" : "nolink");
+  // Default to the session the link points at; the Home tab holds the series stats
+  const [view, setView] = useState("active");
 
   useEffect(() => {
     if (!token) return;
@@ -47,8 +51,9 @@ export default function ShareApp() {
       if (!active) return;
       if (result === "notfound") {
         setStatus("notfound");
-      } else if (result) {
-        setSession(result);
+      } else if (result && result.session) {
+        setSession(result.session);
+        setSeriesStats(result.seriesStats || null);
         setStatus("ok");
       }
       // null (network error): keep showing whatever we had
@@ -69,15 +74,18 @@ export default function ShareApp() {
   if (status === "notfound") return <Door message="This link is no longer valid." />;
   if (status === "loading" && !session) return <Spinner />;
 
-  const goHome = () => { window.location.href = "/"; };
-
   return (
     <div style={S.app}>
-      <Header view={session.ended ? "summary" : "active"} setView={null} activeId={null} isAdmin={false} showNav={false} />
-      {session.ended ? (
-        <SummaryView session={session} isAdmin={false} onResume={() => {}} onBack={goHome} onDelete={() => {}} />
-      ) : (
-        <ActiveView session={session} isAdmin={false} updateSession={() => {}} setModal={() => {}} onEnd={() => {}} />
+      <Header view={view} setView={setView} activeId={session.id} isAdmin={false} />
+      {view === "home" && (
+        <HomeView sessions={[]} isAdmin={false} onNew={null} onOpen={() => {}} precomputedStats={seriesStats} seriesOnly={true} />
+      )}
+      {view === "active" && (
+        session.ended ? (
+          <SummaryView session={session} isAdmin={false} onResume={() => {}} onBack={() => setView("home")} onDelete={() => {}} />
+        ) : (
+          <ActiveView session={session} isAdmin={false} updateSession={() => {}} setModal={() => {}} onEnd={() => {}} />
+        )
       )}
     </div>
   );

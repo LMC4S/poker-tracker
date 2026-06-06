@@ -4,7 +4,7 @@ import { fmtMoney, fmt, exportJSON } from "../utils";
 import { PlusIcon } from "../components/icons";
 import SessionCard from "../components/SessionCard";
 
-export default function HomeView({ sessions, isAdmin, onNew, onOpen, precomputedStats }) {
+export default function HomeView({ sessions, isAdmin, onNew, onOpen, precomputedStats, seriesOnly = false }) {
   const activeSessions = sessions.filter(s => !s.ended);
   const recentEnded = sessions.filter(s => s.ended).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 3);
 
@@ -49,7 +49,7 @@ export default function HomeView({ sessions, isAdmin, onNew, onOpen, precomputed
     return { sessionsThisYear, typicalBuyin, longestSession, biggestWin, biggestLoss, thisYear };
   }, [sessions, precomputedStats]);
 
-  const hasSeriesData = sessions.filter(s => s.ended).length > 0;
+  const hasSeriesData = precomputedStats ? true : sessions.filter(s => s.ended).length > 0;
 
   const statLabel = {
     fontSize: 10, color: "#7a5030", textTransform: "uppercase",
@@ -94,21 +94,21 @@ export default function HomeView({ sessions, isAdmin, onNew, onOpen, precomputed
         </div>
       )}
 
-      {activeSessions.length > 0 && (
+      {!seriesOnly && activeSessions.length > 0 && (
         <div style={S.section}>
           <h3 style={S.sectionTitle}>Active</h3>
           {activeSessions.map(s => <SessionCard key={s.id} session={s} isAdmin={isAdmin} onClick={() => onOpen(s.id)} />)}
         </div>
       )}
 
-      {recentEnded.length > 0 && (
+      {!seriesOnly && recentEnded.length > 0 && (
         <div style={S.section}>
           <h3 style={S.sectionTitle}>Recent</h3>
           {recentEnded.map(s => <SessionCard key={s.id} session={s} isAdmin={isAdmin} onClick={() => onOpen(s.id)} />)}
         </div>
       )}
 
-      {sessions.length === 0 && (
+      {!seriesOnly && sessions.length === 0 && (
         <div style={S.empty}>
           <span style={{ fontSize: 48, opacity: 0.3 }}>♠♥♣♦</span>
           <p style={{ color: "#7a5030", marginTop: 12 }}>No sessions yet. Start your first game!</p>
