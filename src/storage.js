@@ -45,7 +45,7 @@ export async function saveSessions(sessions) {
 // object, the string "notfound" for an invalid/expired link, or null on error.
 export async function loadSharedSession(token) {
   try {
-    const res = await fetch(`/api/session/${encodeURIComponent(token)}`);
+    const res = await fetch(`/api/session?token=${encodeURIComponent(token)}`);
     if (res.status === 404) return "notfound";
     if (!res.ok) throw new Error(`Load failed: ${res.status}`);
     return await res.json();

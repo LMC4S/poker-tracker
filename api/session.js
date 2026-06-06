@@ -50,9 +50,10 @@ function computeSeriesStats(sessions) {
   return { sessionsThisYear, typicalBuyin, longestSession, biggestWin, biggestLoss, thisYear };
 }
 
-// Public read path for a single shared session, gated by an unguessable token.
-// Uses the service key (bypasses RLS) and returns only the one matching session,
-// so the table is never enumerable by anon clients.
+// Public read path for a single shared session, gated by an unguessable token
+// passed as ?token=. Uses the service key (bypasses RLS) and returns only the
+// one matching session plus aggregate series stats, so the table is never
+// enumerable by anon clients.
 export default async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
