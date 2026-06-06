@@ -3,6 +3,7 @@ import { fmtMoney, fmt, profitColor } from "../utils";
 import { handleShare } from "../share";
 import { S, F } from "../styles";
 import { ChevronIcon } from "../components/icons";
+import CopyLinkButton from "../components/CopyLinkButton";
 
 export default function SummaryView({ session, isAdmin, onResume, onBack, onDelete }) {
   const shareRef = useRef(null);
@@ -117,6 +118,7 @@ export default function SummaryView({ session, isAdmin, onResume, onBack, onDele
         <button onClick={onBack} style={S.actionBtnAlt}><ChevronIcon dir="left" size={14}/> Home</button>
         {isAdmin && session.ended && <button onClick={onResume} style={S.actionBtnAlt}>Reopen Session</button>}
         <button onClick={() => handleShare(shareRef)} style={S.actionBtnAlt}>Share</button>
+        <CopyLinkButton token={session.shareToken} />
       </div>
 
       {isAdmin && (

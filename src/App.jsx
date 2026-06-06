@@ -25,7 +25,11 @@ function AppContent({ isAdmin }) {
   // Load sessions once after login (hash is in sessionStorage)
   useEffect(() => {
     loadSessions().then(s => {
-      if (s !== null) { setSessions(s); setSaveEnabled(true); }
+      if (s !== null) {
+        // Backfill share tokens for any pre-existing sessions; the save effect persists them
+        setSessions(s.map(sess => sess.shareToken ? sess : { ...sess, shareToken: crypto.randomUUID() }));
+        setSaveEnabled(true);
+      }
       setLoaded(true);
     });
   }, []);
@@ -72,7 +76,7 @@ function AppContent({ isAdmin }) {
   }, []);
 
   const startNewSession = (name) => {
-    const s = { id: uid(), name: name || `Session ${sessions.length + 1}`, date: new Date().toISOString(), players: [], ended: false };
+    const s = { id: uid(), name: name || `Session ${sessions.length + 1}`, date: new Date().toISOString(), players: [], ended: false, shareToken: crypto.randomUUID() };
     setSessions(prev => [s, ...prev]);
     setActiveId(s.id);
     setView("active");

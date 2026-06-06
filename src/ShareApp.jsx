@@ -1,97 +1,83 @@
 import { useState, useEffect } from "react";
-import { supabase } from "./lib/supabase";
-import { loadPublicSnapshot } from "./storage";
+import { loadSharedSession } from "./storage";
 import { S, FB } from "./styles";
 import Header from "./components/Header";
-import HomeView from "./views/HomeView";
 import ActiveView from "./views/ActiveView";
 import SummaryView from "./views/SummaryView";
 
-const PUBLIC_KEY = "poker-public-v1";
+const POLL_MS = 5000;
+
+function parseToken() {
+  const m = window.location.pathname.match(/^\/s\/(.+)$/);
+  return m ? decodeURIComponent(m[1].replace(/\/$/, "")) : null;
+}
+
+function Door({ message }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#fbf0df" }}>
+      <div style={{ textAlign: "center", padding: 24 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#7a5030", letterSpacing: "4px", textTransform: "uppercase", fontFamily: FB }}>Home Game</div>
+        <div style={{ fontSize: 34, fontWeight: 900, color: "#2a0a08", letterSpacing: "4px", textTransform: "uppercase", marginTop: 6, fontFamily: FB }}>Tracker</div>
+        <div style={{ marginTop: 32, color: "#7a5030", fontSize: 13, letterSpacing: "1px", maxWidth: 320, lineHeight: 1.6 }}>{message}</div>
+      </div>
+    </div>
+  );
+}
+
+function Spinner() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#fbf0df" }}>
+      <div style={S.spinner} />
+    </div>
+  );
+}
 
 export default function ShareApp() {
-  const [snapshot, setSnapshot] = useState(null);
-  const [loaded, setLoaded] = useState(false);
-  const [view, setView] = useState("home");
-  const [openId, setOpenId] = useState(null);
+  const token = parseToken();
+  const [session, setSession] = useState(null);
+  // loading | ok | notfound | nolink
+  const [status, setStatus] = useState(token ? "loading" : "nolink");
 
   useEffect(() => {
-    loadPublicSnapshot().then(s => {
-      setSnapshot(s);
-      setLoaded(true);
-    });
+    if (!token) return;
+    let active = true;
 
-    if (!supabase) return;
-    const channel = supabase
-      .channel("poker-public-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "poker_public" }, (payload) => {
-        if (payload.new?.value) setSnapshot(JSON.parse(payload.new.value));
-      })
-      .subscribe();
-    return () => supabase.removeChannel(channel);
-  }, []);
+    const run = async () => {
+      const result = await loadSharedSession(token);
+      if (!active) return;
+      if (result === "notfound") {
+        setStatus("notfound");
+      } else if (result) {
+        setSession(result);
+        setStatus("ok");
+      }
+      // null (network error): keep showing whatever we had
+    };
 
-  if (!loaded) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#fbf0df" }}>
-        <div style={S.spinner} />
-      </div>
-    );
-  }
+    run();
+    const interval = setInterval(() => { if (!document.hidden) run(); }, POLL_MS);
+    const onVisibility = () => { if (!document.hidden) run(); };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      active = false;
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [token]);
 
-  const hasActiveSession = snapshot && snapshot.activeSessions && snapshot.activeSessions.length > 0;
+  if (status === "nolink") return <Door message="Use the link shared with you to view a session." />;
+  if (status === "notfound") return <Door message="This link is no longer valid." />;
+  if (status === "loading" && !session) return <Spinner />;
 
-  if (!hasActiveSession) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#fbf0df" }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#7a5030", letterSpacing: "4px", textTransform: "uppercase", fontFamily: FB }}>Home Game</div>
-          <div style={{ fontSize: 34, fontWeight: 900, color: "#2a0a08", letterSpacing: "4px", textTransform: "uppercase", marginTop: 6, fontFamily: FB }}>Tracker</div>
-          <div style={{ marginTop: 32, color: "#7a5030", fontSize: 13, letterSpacing: "1px" }}>No active session right now.</div>
-        </div>
-      </div>
-    );
-  }
-
-  const allSessions = [...snapshot.activeSessions, ...snapshot.recentEnded];
-  const openSession = allSessions.find(s => s.id === openId);
-
-  const handleOpen = (id) => {
-    const s = allSessions.find(x => x.id === id);
-    if (!s) return;
-    setOpenId(id);
-    setView(s.ended ? "summary" : "active");
-  };
+  const goHome = () => { window.location.href = "/"; };
 
   return (
     <div style={S.app}>
-      <Header view={view} setView={setView} activeId={null} isAdmin={false} />
-      {view === "home" && (
-        <HomeView
-          sessions={allSessions}
-          isAdmin={false}
-          onNew={null}
-          onOpen={handleOpen}
-          precomputedStats={snapshot.seriesStats}
-        />
-      )}
-      {view === "active" && openSession && (
-        <ActiveView
-          session={openSession}
-          isAdmin={false}
-          updateSession={() => {}}
-          setModal={() => {}}
-          onEnd={() => {}}
-        />
-      )}
-      {view === "summary" && openSession && (
-        <SummaryView
-          session={openSession}
-          isAdmin={false}
-          onResume={() => {}}
-          onBack={() => setView("home")}
-          onDelete={() => {}}
-        />
+      <Header view={session.ended ? "summary" : "active"} setView={null} activeId={null} isAdmin={false} showNav={false} />
+      {session.ended ? (
+        <SummaryView session={session} isAdmin={false} onResume={() => {}} onBack={goHome} onDelete={() => {}} />
+      ) : (
+        <ActiveView session={session} isAdmin={false} updateSession={() => {}} setModal={() => {}} onEnd={() => {}} />
       )}
     </div>
   );
