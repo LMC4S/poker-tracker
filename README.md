@@ -8,7 +8,7 @@
 
 Self-hosted web app for home game hosts to track buy-ins, cashouts, and balances during a session. The host runs the session; players who have the link for a session can follow it in their browser, read-only. Data stays in your own Supabase database.
 
-No player accounts. Admin access is PIN-protected, and the full session history never leaves the server. See [Security](#security) for details.
+No player accounts. Admin access is PIN-protected, and the full session history never leaves the server.
 
 📖 **[Developer documentation](https://lmc4s.github.io/poker-tracker/docs/)** — architecture, data model, HTTP API reference, auth flow, and security model. ([source](docs/index.html))
 
@@ -89,53 +89,11 @@ This runs the app on `localhost:3000` with the API routes working.
 
 `npm run dev` (plain Vite, on `localhost:5173`) builds the front end but does not serve `api/`, so only the root prompt renders. For UI-only work without a database, the admin panel falls back to `localStorage` when the API is absent.
 
-## Stack
+## How it works
 
-| Layer | Tech |
-|---|---|
-| **UI** | React 18 + Vite |
-| **Database** | Supabase (Postgres) |
-| **API** | Vercel Serverless Functions |
-| **Screenshot share** | html2canvas + Web Share API |
-| **Fonts** | Oswald, Cormorant Garamond, Inter |
+A React single-page app with two surfaces: a PIN-gated admin panel (the only writer) and a public, read-only observer view reached by an unguessable per-session token. All database access goes through Vercel serverless functions that hold the Supabase service key — the browser never has a database credential, and the single `poker_data` table denies all anonymous access.
 
-## Architecture
-
-All database access goes through serverless functions holding the service key. The browser never has a database credential.
-
-```
-   Admin (/admin)                     Observer (/s/<token>)
-        │                                     │
-        ▼                                     ▼
-  ┌──────────────┐                   ┌──────────────────┐
-  │  /api/auth   │                   │  /api/session    │
-  │  /api/sessions│                  │  ?token=...      │
-  └──────┬───────┘                   └────────┬─────────┘
-         │  service key                       │  service key
-         ▼                                     ▼
-   ┌──────────────────────── poker_data ──────────────────┐
-   │  full history (RLS: deny all anon)                    │
-   └──────────────────────────────────────────────────────┘
-```
-
-| | Observer (`/s/<token>`) | Admin (`/admin`) |
-|---|---|---|
-| **Access** | Holds a session's token | PIN required |
-| **Sees** | One session + aggregate series stats | All sessions, full history |
-| **Source** | `/api/session?token=` | `/api/sessions` |
-| **Updates** | 5-second polling | 5-second polling |
-| **Writes** | None | `x-admin-secret` header |
-
-## Security
-
-One database table, `poker_data`, holds everything. Its RLS policy denies all anonymous access, and no database credential ships in the browser bundle. Every read and write goes through a serverless function that uses the service key:
-
-- **Admin** routes (`/api/auth`, `/api/sessions`) require the `x-admin-secret` header, checked server-side with a constant-time comparison.
-- **Observer** route (`/api/session`) takes a session token and returns only that one session plus aggregate series stats. There is no way to list or enumerate sessions.
-
-The admin PIN is SHA-256 hashed in the browser before it is sent. The admin session persists in `localStorage` so it survives app-switching and reloads on mobile; clear site data to log out.
-
-Share tokens are random UUIDs. Anyone with a session's link can view that session, so treat links as you would the information in them.
+For the architecture, data model, HTTP API reference, auth flow, and security model, see the **[developer documentation](https://lmc4s.github.io/poker-tracker/docs/)**.
 
 ## License
 
