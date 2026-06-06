@@ -69,26 +69,6 @@ Vercel gives you a URL like `https://your-app.vercel.app`.
 
 Custom domain: Vercel project → **Settings → Domains**.
 
-## Local development
-
-Local dev is for working on the code. To run a real game with your group, [deploy to Vercel](#install).
-
-The share view and the admin panel both depend on the serverless API routes in `api/`, which Vite does not serve. Use `vercel dev` to run them locally:
-
-```bash
-npm install
-cp .env.example .env.local   # fill in your Supabase keys
-npx vercel dev
-```
-
-This runs the app on `localhost:3000` with the API routes working.
-
-- `localhost:3000/admin` — admin panel (PIN required; default PIN is `AKo`, set in `.env.example`)
-- `localhost:3000/s/<token>` — shared read-only view of one session
-- `localhost:3000/` — the "use a shared link" prompt
-
-`npm run dev` (plain Vite, on `localhost:5173`) builds the front end but does not serve `api/`, so only the root prompt renders. For UI-only work without a database, the admin panel falls back to `localStorage` when the API is absent.
-
 ## How it works
 
 A React single-page app with two surfaces: a PIN-gated admin panel (the only writer) and a public, read-only observer view reached by an unguessable per-session token. All database access goes through Vercel serverless functions that hold the Supabase service key — the browser never has a database credential, and the single `poker_data` table denies all anonymous access.
