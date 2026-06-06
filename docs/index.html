@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Home Game Tracker — Documentation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Oswald:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fbf0df;
+    --card: #fff9ef;
+    --ink: #2a0a08;
+    --muted: #7a5030;
+    --faint: #b89878;
+    --line: #d4b898;
+    --accent: #450206;
+    --serif: 'Cormorant Garamond', Georgia, serif;
+    --display: 'Oswald', sans-serif;
+    --body: 'Inter', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--body);
+    line-height: 1.65;
+    font-size: 16px;
+  }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 48px 24px 80px; }
+  header { text-align: center; padding: 24px 0 40px; border-bottom: 1px solid var(--line); margin-bottom: 40px; }
+  .kicker { font-family: var(--display); font-size: 13px; font-weight: 700; letter-spacing: 4px; text-transform: uppercase; color: var(--muted); }
+  h1 { font-family: var(--serif); font-size: 52px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin: 6px 0 0; }
+  .sub { color: var(--muted); font-size: 15px; margin-top: 12px; }
+  h2 { font-family: var(--display); font-size: 22px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin: 48px 0 4px; color: var(--ink); }
+  h2 + .lede { color: var(--muted); margin-top: 0; margin-bottom: 16px; }
+  h3 { font-family: var(--display); font-size: 15px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); margin: 28px 0 6px; }
+  a { color: var(--accent); }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; background: #f0e2cc; padding: 2px 6px; border-radius: 4px; }
+  pre { background: var(--ink); color: #f5e9d8; padding: 16px 18px; border-radius: 10px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+  pre code { background: none; padding: 0; color: inherit; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; margin: 16px 0; }
+  ul, ol { padding-left: 22px; }
+  li { margin: 6px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: var(--display); font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+  .pill { display: inline-block; font-family: var(--display); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line); border-radius: 20px; padding: 3px 10px; margin-right: 6px; }
+  .note { border-left: 3px solid var(--faint); padding: 4px 0 4px 16px; color: var(--muted); margin: 16px 0; }
+  nav.toc { font-size: 14px; }
+  nav.toc a { display: inline-block; margin: 0 14px 8px 0; color: var(--muted); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent); }
+  .divider { display: flex; align-items: center; gap: 10px; margin: 12px 0; color: var(--faint); }
+  .divider .l { flex: 1; height: 1px; background: var(--line); }
+  footer { margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--line); text-align: center; color: var(--faint); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="kicker">Home Game</div>
+    <h1>Tracker</h1>
+    <div class="sub">Documentation for hosts and players</div>
+  </header>
+
+  <nav class="toc">
+    <a href="#what">What it is</a>
+    <a href="#players">For players</a>
+    <a href="#hosts">For hosts</a>
+    <a href="#sharing">Sharing &amp; privacy</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#security">Security</a>
+    <a href="#selfhost">Self-hosting</a>
+  </nav>
+
+  <h2 id="what">What it is</h2>
+  <p class="lede">A tool for running the money side of a home poker game.</p>
+  <p>
+    The host tracks buy-ins, rebuys, and cashouts during a session and uses the running totals to settle up afterward.
+    Players who have a session's link can watch that session in their browser, read-only. There are no player accounts,
+    and the data lives in the host's own database.
+  </p>
+
+  <h2 id="players">For players</h2>
+  <p class="lede">You were sent a link. Here is what you can do with it.</p>
+  <div class="card">
+    <p>A session link looks like <code>https://your-app.vercel.app/s/&lt;token&gt;</code>. Open it in any browser. No login, no install.</p>
+    <h3>Two tabs</h3>
+    <ul>
+      <li><span class="pill">Session</span> The game you were linked to: each player's buy-in, cashout, and net. Updates every few seconds while the game is live, and stays viewable with final standings after it ends.</li>
+      <li><span class="pill">Home</span> Series stats across all of the host's games: sessions played this year, typical buy-in, longest session, biggest win and loss. These are aggregate numbers only.</li>
+    </ul>
+    <div class="note">You only ever see the one session you were linked to. The link does not let you browse other games, and there is no player-by-player history.</div>
+  </div>
+
+  <h2 id="hosts">For hosts</h2>
+  <p class="lede">The admin panel is where you run the session.</p>
+  <p>Go to <code>/admin</code> and enter your PIN. From there:</p>
+  <table>
+    <tr><th>Action</th><th>What it does</th></tr>
+    <tr><td>New Session</td><td>Starts a game. Each session gets its own share link automatically.</td></tr>
+    <tr><td>Add Player</td><td>Adds someone to the table with their first buy-in. Names autocomplete from past games.</td></tr>
+    <tr><td>Rebuy</td><td>Adds another buy-in to a player already at the table.</td></tr>
+    <tr><td>Cash Out</td><td>Records what a player leaves with. Their net is buy-ins minus cashout. Use the undo arrow to correct a mistake.</td></tr>
+    <tr><td>End Session</td><td>Closes the game and shows the final summary. You can reopen it if needed.</td></tr>
+    <tr><td>Copy Link</td><td>Copies that session's share link to send to the group.</td></tr>
+    <tr><td>Share</td><td>Generates a screenshot summary card ranked by net, to post in a group chat.</td></tr>
+    <tr><td>Backup Data</td><td>Downloads all sessions as a JSON file.</td></tr>
+  </table>
+  <div class="note">When the table balances (total cashouts equal total buy-ins), the summary shows a check instead of a number. If it does not balance, the difference is shown so you can find the missing count.</div>
+
+  <h2 id="sharing">Sharing &amp; privacy</h2>
+  <p class="lede">Links are per-session and unguessable.</p>
+  <ul>
+    <li>Every session has a random UUID token. The link is the only way in; tokens cannot be guessed or listed.</li>
+    <li>The root URL with no token (<code>/</code>) shows only a prompt to use a shared link. There is no public list of games.</li>
+    <li>A link keeps working after a session ends, showing the final standings.</li>
+    <li>Anyone who has a link can view that session, so share links the same way you would share the numbers themselves.</li>
+  </ul>
+
+  <h2 id="architecture">Architecture</h2>
+  <p class="lede">All database access runs through serverless functions. The browser holds no database credential.</p>
+  <pre><code>   Admin (/admin)                 Observer (/s/&lt;token&gt;)
+        |                                 |
+        v                                 v
+  /api/auth                         /api/session?token=...
+  /api/sessions                            |
+        |   service key                    |  service key
+        v                                  v
+  +------------------ poker_data ---------------------+
+  |  full history  (RLS: deny all anonymous access)   |
+  +---------------------------------------------------+</code></pre>
+  <table>
+    <tr><th></th><th>Observer</th><th>Admin</th></tr>
+    <tr><td>Access</td><td>Holds a session token</td><td>PIN required</td></tr>
+    <tr><td>Sees</td><td>One session + aggregate stats</td><td>All sessions, full history</td></tr>
+    <tr><td>Source</td><td><code>/api/session?token=</code></td><td><code>/api/sessions</code></td></tr>
+    <tr><td>Updates</td><td>5-second polling</td><td>5-second polling</td></tr>
+    <tr><td>Writes</td><td>None</td><td><code>x-admin-secret</code> header</td></tr>
+  </table>
+
+  <h2 id="security">Security</h2>
+  <p class="lede">One table, no anonymous database access, every path gated server-side.</p>
+  <ul>
+    <li>All data lives in a single <code>poker_data</code> table whose row-level-security policy denies all anonymous access.</li>
+    <li>No database credential ships in the browser bundle. Reads and writes go through serverless functions using the service key.</li>
+    <li>Admin routes require an <code>x-admin-secret</code> header, checked with a constant-time comparison.</li>
+    <li>The observer route returns only the one session matching a token plus aggregate stats. Sessions cannot be enumerated.</li>
+    <li>The admin PIN is SHA-256 hashed in the browser before being sent.</li>
+  </ul>
+
+  <h2 id="selfhost">Self-hosting</h2>
+  <p class="lede">Runs on the Vercel and Supabase free tiers.</p>
+  <div class="card">
+    <h3>Database</h3>
+    <p>Create a Supabase project and run <code>supabase/migrations/20260101000000_init.sql</code> in the SQL Editor. Copy the Project URL and the service_role secret from Project Settings &rarr; API.</p>
+    <h3>Deploy</h3>
+    <p>Deploy the repo to Vercel and set four environment variables:</p>
+    <table>
+      <tr><th>Variable</th><th>Value</th></tr>
+      <tr><td><code>SUPABASE_URL</code></td><td>Supabase Project URL</td></tr>
+      <tr><td><code>SUPABASE_SERVICE_KEY</code></td><td>service_role secret</td></tr>
+      <tr><td><code>ADMIN_PIN</code></td><td>Your admin password</td></tr>
+      <tr><td><code>ADMIN_API_SECRET</code></td><td><code>openssl rand -hex 32</code></td></tr>
+    </table>
+    <div class="note">See the <a href="../README.md">README</a> for the full step-by-step and local-development setup.</div>
+  </div>
+
+  <div class="divider"><span>&#10087;</span><span class="l"></span><span>&#10089;</span></div>
+
+  <footer>
+    Home Game Tracker &middot; MIT License &middot; built on React, Vercel, and Supabase
+  </footer>
+
+</div>
+</body>
+</html>
