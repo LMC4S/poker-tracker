@@ -1,4 +1,4 @@
-import { createHash } from "crypto";
+import { createHash, timingSafeEqual } from "crypto";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -22,7 +22,9 @@ export default async function handler(req, res) {
 
   const expectedHash = createHash("sha256").update(adminPin).digest("hex");
 
-  if (hash !== expectedHash) {
+  const hashBuf = Buffer.from(hash, "hex");
+  const expectedBuf = Buffer.from(expectedHash, "hex");
+  if (hashBuf.length !== expectedBuf.length || !timingSafeEqual(hashBuf, expectedBuf)) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 

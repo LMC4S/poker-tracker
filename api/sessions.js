@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { timingSafeEqual } from "crypto";
 
 const DATA_KEY = "poker-sessions-v2";
 const PUBLIC_KEY = "poker-public-v1";
@@ -70,7 +71,10 @@ export default async function handler(req, res) {
   if (!expectedSecret) {
     return res.status(500).json({ error: "Server not configured: missing ADMIN_API_SECRET" });
   }
-  if (!adminSecret || adminSecret !== expectedSecret) {
+  const secretMatch = adminSecret &&
+    adminSecret.length === expectedSecret.length &&
+    timingSafeEqual(Buffer.from(adminSecret), Buffer.from(expectedSecret));
+  if (!secretMatch) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
