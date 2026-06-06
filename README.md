@@ -43,7 +43,7 @@ Then go to **Project Settings → API** and copy:
 
 Click the button below. It clones the repo to your GitHub, prompts you for the keys from Step 1, and deploys.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/LMC4S/AKo&project-name=ako&repository-name=ako&env=VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY,SUPABASE_URL,SUPABASE_SERVICE_KEY,ADMIN_PIN,ADMIN_API_SECRET&envDescription=VITE_SUPABASE_URL%20and%20VITE_SUPABASE_ANON_KEY%3A%20from%20Supabase%20Project%20Settings%20%E2%86%92%20API.%20SUPABASE_URL%3A%20same%20as%20VITE_SUPABASE_URL.%20SUPABASE_SERVICE_KEY%3A%20service_role%20secret%20from%20Supabase.%20ADMIN_PIN%3A%20your%20admin%20password.%20ADMIN_API_SECRET%3A%20run%20openssl%20rand%20-hex%2032%20to%20generate.)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/LMC4S/poker-tracker&project-name=poker-tracker&repository-name=poker-tracker&env=VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY,SUPABASE_URL,SUPABASE_SERVICE_KEY,ADMIN_PIN,ADMIN_API_SECRET&envDescription=VITE_SUPABASE_URL%20and%20VITE_SUPABASE_ANON_KEY%3A%20from%20Supabase%20Project%20Settings%20%E2%86%92%20API.%20SUPABASE_URL%3A%20same%20as%20VITE_SUPABASE_URL.%20SUPABASE_SERVICE_KEY%3A%20service_role%20secret%20from%20Supabase.%20ADMIN_PIN%3A%20your%20admin%20password.%20ADMIN_API_SECRET%3A%20run%20openssl%20rand%20-hex%2032%20to%20generate.)
 
 When prompted for env vars:
 
