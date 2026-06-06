@@ -12,7 +12,7 @@ Self-hosted web app for tracking buy-ins, cashouts, and balances during a home p
 
 ## How sharing works
 
-Each session has its own share link of the form `https://<app>.vercel.app/s/<token>`. The token is a random UUID, so links are neither guessable nor enumerable.
+Each session has its own share link of the form `https://<app>.vercel.app/s/<token>`.
 
 - The host copies a session's link and sends it to the players.
 - Anyone holding the link sees that single session, read-only, refreshed every few seconds. The link remains valid after the session ends and shows the final standings.
