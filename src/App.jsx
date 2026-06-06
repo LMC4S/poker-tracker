@@ -20,6 +20,7 @@ function AppContent({ isAdmin }) {
   const [summaryId, setSummaryId] = useState(null);
 
   const pendingSaveRef = useRef(null);
+  const savingRef = useRef(false);
 
   // Load sessions once after login (hash is in sessionStorage)
   useEffect(() => {
@@ -33,14 +34,21 @@ function AppContent({ isAdmin }) {
   useEffect(() => {
     if (!saveEnabled) return;
     clearTimeout(pendingSaveRef.current);
-    pendingSaveRef.current = setTimeout(() => saveSessions(sessions), 300);
+    pendingSaveRef.current = setTimeout(async () => {
+      savingRef.current = true;
+      await saveSessions(sessions);
+      savingRef.current = false;
+      pendingSaveRef.current = null;
+    }, 300);
   }, [sessions, saveEnabled]);
 
   // Poll every 5s to sync across admin devices — pause when tab is hidden
+  // Skip poll if a save is pending or in-flight to avoid overwriting local changes
   useEffect(() => {
     if (!saveEnabled) return;
     let interval = null;
     const poll = async () => {
+      if (pendingSaveRef.current || savingRef.current) return;
       const fresh = await loadSessions();
       if (fresh === null) return;
       setSessions(prev => {

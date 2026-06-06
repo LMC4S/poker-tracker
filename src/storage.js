@@ -4,7 +4,7 @@ import { STORAGE_KEY } from "./utils";
 const PUBLIC_KEY = "poker-public-v1";
 
 function getAdminHash() {
-  return sessionStorage.getItem("poker-admin-secret");
+  return localStorage.getItem("poker-admin-secret");
 }
 
 export async function loadSessions() {

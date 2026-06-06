@@ -130,6 +130,8 @@ poker_data   compute         poker_public ◄── Realtime subscribe
 
 Two separate database tables — `poker_data` (private, RLS blocks all anonymous access) and `poker_public` (read-only snapshot for observers). The server decides what goes into the snapshot on each save. Admin PIN is SHA-256 hashed before it leaves the browser, and the only credential in the client bundle is the Supabase anon key, which can only read the public table. All writes require a server-side secret check.
 
+The admin session (PIN + API secret) persists in `localStorage` so it survives app-switching and page reloads on mobile. To log out, clear the site data in your browser.
+
 ## License
 
 MIT

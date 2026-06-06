@@ -6,9 +6,9 @@ const ADMIN_SECRET_KEY = "poker-admin-secret";
 
 export default function PinGate({ children }) {
   const [role, setRole] = useState(() => {
-    const r = sessionStorage.getItem(SESSION_KEY);
+    const r = localStorage.getItem(SESSION_KEY);
     // Require secret to be present — old sessions without it must re-login
-    if (r === "admin" && !sessionStorage.getItem(ADMIN_SECRET_KEY)) return null;
+    if (r === "admin" && !localStorage.getItem(ADMIN_SECRET_KEY)) return null;
     return r || null;
   });
   const [input, setInput] = useState("");
@@ -51,15 +51,15 @@ export default function PinGate({ children }) {
 
       // API not available (local dev without serverless functions) — skip PIN gate
       if (res.status === 404) {
-        sessionStorage.setItem(SESSION_KEY, "admin");
+        localStorage.setItem(SESSION_KEY, "admin");
         setRole("admin");
         return;
       }
 
       if (res.ok) {
         const { secret } = await res.json();
-        sessionStorage.setItem(SESSION_KEY, "admin");
-        sessionStorage.setItem(ADMIN_SECRET_KEY, secret);
+        localStorage.setItem(SESSION_KEY, "admin");
+        localStorage.setItem(ADMIN_SECRET_KEY, secret);
         localStorage.removeItem(LOCKOUT_KEY);
         setRole("admin");
       } else {
@@ -79,7 +79,7 @@ export default function PinGate({ children }) {
       }
     } catch {
       // API unreachable (local dev without serverless functions) — skip PIN gate
-      sessionStorage.setItem(SESSION_KEY, "admin");
+      localStorage.setItem(SESSION_KEY, "admin");
       setRole("admin");
     } finally {
       setSubmitting(false);
