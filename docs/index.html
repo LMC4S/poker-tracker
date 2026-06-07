@@ -112,7 +112,7 @@
       <tr><td>UI</td><td>React 18, Vite 5</td><td>Inline-style components, no CSS framework</td></tr>
       <tr><td>API</td><td>Vercel Serverless Functions</td><td>Node, zero-config <code>api/</code> directory</td></tr>
       <tr><td>DB</td><td>Supabase (Postgres)</td><td>Accessed only via <code>@supabase/supabase-js</code> server-side</td></tr>
-      <tr><td>Screenshot</td><td>html2canvas + Web Share API</td><td>Client-side summary card export</td></tr>
+      <tr><td>QR</td><td>qrcode.react</td><td>Per-session share-link QR code</td></tr>
       <tr><td>Analytics</td><td>@vercel/analytics</td><td>Injected in <code>main.jsx</code></td></tr>
     </table>
 
@@ -126,21 +126,19 @@ src/
   App.jsx              Entry; routes /admin -&gt; PinGate+AppContent, else ShareApp
   ShareApp.jsx         Observer view (/s/&lt;token&gt;), polling, two tabs
   storage.js           Client data layer (fetch wrappers)
-  utils.js             Keys, sha256, uid, money formatting, exportJSON
+  utils.js             Keys, sha256, uid, money/duration formatting, log + end-time helpers, exportJSON
   styles.js            Shared inline style objects
-  share.js             html2canvas screenshot + Web Share
   components/
     PinGate.jsx        Admin auth gate with lockout
     Header.jsx         Title + tab nav (showNav toggle)
     Modal.jsx          Add player / rebuy / cashout dialogs
     SessionCard.jsx    Session list item (admin home)
-    StatBox.jsx        Stat tile
-    CopyLinkButton.jsx Copies /s/&lt;token&gt; to clipboard
+    QRModal.jsx        QR code for a session's /s/&lt;token&gt; link
     icons.jsx          Inline SVG icons
   views/
     HomeView.jsx       Series stats + session lists (seriesOnly flag)
-    ActiveView.jsx     Live session table + admin actions
-    SummaryView.jsx    Ended session summary + delete/reopen/share
+    ActiveView.jsx     Live session table + admin actions + activity log
+    SummaryView.jsx    Ended session summary + delete/reopen/QR
 supabase/migrations/   SQL (init + per-session-share)
 vercel.json            SPA rewrites
 vite.config.js         Dev server opens /admin</code></pre>
@@ -152,10 +150,11 @@ vite.config.js         Dev server opens /admin</code></pre>
   id: <span class="tok-s">string</span>,           <span class="tok-c">// uid(): base36 timestamp + random</span>
   name: <span class="tok-s">string</span>,         <span class="tok-c">// e.g. "Session 27" or custom</span>
   date: <span class="tok-s">string</span>,         <span class="tok-c">// ISO 8601, session start</span>
-  endDate?: <span class="tok-s">string</span>,     <span class="tok-c">// ISO 8601, set on End Session</span>
+  endDate?: <span class="tok-s">string</span>,     <span class="tok-c">// ISO 8601, last cash-out time (fallback: End Session time)</span>
   ended: <span class="tok-k">boolean</span>,
   shareToken: <span class="tok-s">string</span>,   <span class="tok-c">// crypto.randomUUID(), the public link key</span>
-  players: Player[]
+  players: Player[],
+  log: LogEntry[]          <span class="tok-c">// append-only activity history</span>
 }
 
 <span class="tok-c">// Player</span>
@@ -163,9 +162,18 @@ vite.config.js         Dev server opens /admin</code></pre>
   id: <span class="tok-s">string</span>,           <span class="tok-c">// uid()</span>
   name: <span class="tok-s">string</span>,
   buyins: <span class="tok-k">number</span>[],      <span class="tok-c">// each rebuy appended; total = sum</span>
-  cashout: <span class="tok-k">number</span> | <span class="tok-k">null</span> <span class="tok-c">// null until cashed out</span>
+  cashout: <span class="tok-k">number</span> | <span class="tok-k">null</span>, <span class="tok-c">// null until cashed out</span>
+  cashoutAt?: <span class="tok-s">string</span>    <span class="tok-c">// ISO 8601, when cashed out (cleared on undo)</span>
+}
+
+<span class="tok-c">// LogEntry</span>
+{
+  t: <span class="tok-s">string</span>,            <span class="tok-c">// ISO 8601 timestamp</span>
+  type: <span class="tok-s">string</span>,         <span class="tok-c">// "join" | "buyin" | "cashout" | "undo" | "remove"</span>
+  player: <span class="tok-s">string</span>,       <span class="tok-c">// player name</span>
+  amount?: <span class="tok-k">number</span>       <span class="tok-c">// for join / buyin / cashout</span>
 }</code></pre>
-    <p><b>Derived values</b> (computed, never stored): a player's net is <code>cashout − sum(buyins)</code>. A session balances when total cashouts equal total buy-ins. <code>shareToken</code> is assigned on session creation and backfilled onto any token-less session when the admin app loads.</p>
+    <p><b>Derived values</b> (computed, never stored): a player's net is <code>cashout − sum(buyins)</code>. A session balances when total cashouts equal total buy-ins. <code>endDate</code> is recomputed from the latest <code>cashoutAt</code> on every cash-out, undo, and player removal (so a forgotten "End Session" tap doesn't corrupt the recorded end time); it falls back to the End Session time only if nobody cashed out. <code>shareToken</code> is assigned on session creation and backfilled onto any token-less session when the admin app loads.</p>
 
     <h2 id="storage">Storage &amp; keys</h2>
     <h3>Server (Postgres)</h3>

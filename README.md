@@ -21,10 +21,11 @@ Each session has its own share link of the form `https://<app>.vercel.app/s/<tok
 
 ## Features
 
-- Per-session share links — players follow a session live in any mobile browser, with no app install
-- Buy-ins, rebuys, cashouts, and undo, with player-name autocomplete from past games
+- Per-session share links with a scannable QR code — players follow a session live in any mobile browser, with no app install
+- Buy-ins, rebuys, tap-to-cash-out, and undo, with player-name autocomplete from past games
+- Timestamped activity log for every buy-in, rebuy, and cash-out
+- Session end time recorded automatically from the last cash-out
 - Series stats across all games — sessions played, typical buy-in, longest session, biggest swing
-- Screenshot summary card ranked by net profit, shared via the Web Share API or saved as PNG
 - One-click JSON backup of all data
 - Mobile-first layout
 - Runs on the Vercel and Supabase free tiers
@@ -61,7 +62,7 @@ Required environment variables:
 Vercel assigns a URL such as `https://<app>.vercel.app`.
 
 - **Admin:** open `/admin`, enter the PIN, and create a session.
-- **Players:** the host opens a session, taps **Copy Link**, and sends it. Each session has its own link.
+- **Players:** the host opens a session, taps **QR Code**, and players scan it (or open the link) to follow along. Each session has its own link.
 
 A custom domain can be configured under the Vercel project's **Settings → Domains**.
 
