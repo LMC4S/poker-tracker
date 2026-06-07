@@ -54,7 +54,7 @@ export const S = {
   modalBtnAlt: { width: "100%", padding: "12px", background: "#fbf0df", color: "#450206", border: "1px solid #d4b898", borderRadius: 24, fontSize: 12, fontWeight: 600, cursor: "pointer", letterSpacing: "1px", textTransform: "uppercase", fontFamily: F },
   cashoutDash: { background: "none", border: "1px dashed #c4a880", borderRadius: 6, padding: "2px 10px", color: "#7a5030", fontSize: 14, cursor: "pointer", fontFamily: FB },
   chipRow: { display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 },
-  chip: { padding: "8px 14px", background: "#fbf0df", border: "1px solid #d4b898", borderRadius: 20, color: "#450206", fontSize: 15, cursor: "pointer", fontFamily: FB, letterSpacing: "0.3px" },
+  chip: { padding: "9px 15px", background: "#f0e0c4", border: "1px solid #c4a880", borderRadius: 20, color: "#450206", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: F, letterSpacing: "0.8px" },
   chipActive: { background: "#450206", color: "#ffffff", border: "1px solid #450206" },
   logWrap: { marginTop: 16 },
   logToggle: { width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 14px", background: "#f0e0c4", border: "1px solid #d4b898", borderRadius: 10, fontSize: 10, fontWeight: 700, color: "#7a5030", letterSpacing: 1.5, textTransform: "uppercase", cursor: "pointer", fontFamily: F },
