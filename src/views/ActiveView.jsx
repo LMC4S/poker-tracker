@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { fmtMoney, fmt, profitColor } from "../utils";
+import { fmtMoney, fmt, profitColor, logEvent, logLabel } from "../utils";
 import { handleShare } from "../share";
 import { S, F } from "../styles";
 import { PlusIcon, TrashIcon } from "../components/icons";
@@ -9,6 +9,9 @@ import QRModal from "../components/QRModal";
 export default function ActiveView({ session, isAdmin, updateSession, setModal, onEnd }) {
   const [confirmingId, setConfirmingId] = useState(null);
   const [showQR, setShowQR] = useState(false);
+  const [cashoutId, setCashoutId] = useState(null);
+  const [cashoutVal, setCashoutVal] = useState("");
+  const [showLog, setShowLog] = useState(false);
   const totalBuyins = session.players.reduce((a, p) => a + p.buyins.reduce((b, x) => b + x, 0), 0);
   const totalCashouts = session.players.filter(p => p.cashout !== null).reduce((a, p) => a + p.cashout, 0);
   const cashedOutCount = session.players.filter(p => p.cashout !== null).length;
@@ -17,15 +20,30 @@ export default function ActiveView({ session, isAdmin, updateSession, setModal, 
   const cardRef = useRef(null);
 
   const removePlayer = (pid) => {
-    updateSession(session.id, s => ({ ...s, players: s.players.filter(p => p.id !== pid) }));
+    updateSession(session.id, s => {
+      const p = s.players.find(x => x.id === pid);
+      const next = { ...s, players: s.players.filter(x => x.id !== pid) };
+      return p ? logEvent(next, "remove", p.name) : next;
+    });
   };
 
   const undoCashout = (pid) => {
     updateSession(session.id, s => {
       const p = s.players.find(x => x.id === pid);
-      if (p) p.cashout = null;
+      if (p) { p.cashout = null; return logEvent(s, "undo", p.name); }
       return s;
     });
+  };
+
+  const saveCashout = (pid) => {
+    const amount = parseFloat(cashoutVal);
+    if (isNaN(amount) || amount < 0) return;
+    updateSession(session.id, s => {
+      const p = s.players.find(x => x.id === pid);
+      if (p) { p.cashout = amount; return logEvent(s, "cashout", p.name, amount); }
+      return s;
+    });
+    setCashoutId(null); setCashoutVal("");
   };
 
   const dateStr = new Date(session.date).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
@@ -85,14 +103,12 @@ export default function ActiveView({ session, isAdmin, updateSession, setModal, 
 
       <div style={S.statsRow}>
         <StatBox label="Total Buy-in" value={fmtMoney(totalBuyins)} />
-        <StatBox label="Cashed Out" value={`${cashedOutCount}/${session.players.length}`} />
         {allCashedOut && <StatBox label="Balance" value={balance === 0 ? "✓ OK" : fmt(balance)} color="#ffffff" />}
       </div>
 
       <div style={S.actions}>
         {isAdmin && <button onClick={() => setModal({ type: "addPlayer" })} style={S.actionBtn}><PlusIcon size={16}/> Add Player</button>}
         {isAdmin && <button onClick={() => setModal({ type: "buyin" })} style={S.actionBtnAlt}>Rebuy</button>}
-        {isAdmin && <button onClick={() => setModal({ type: "cashout" })} style={S.actionBtnAlt}>Cash Out</button>}
         {session.shareToken && <button onClick={() => setShowQR(true)} style={S.actionBtnAlt}>QR Code</button>}
         {showQR && <QRModal session={session} onClose={() => setShowQR(false)} />}
       </div>
@@ -128,9 +144,31 @@ export default function ActiveView({ session, isAdmin, updateSession, setModal, 
                   {fmtMoney(totalBuyin)}
                   {p.buyins.length > 1 && <span style={{ color: "#7a5030", fontSize: 11, marginLeft: 4 }}>({p.buyins.map(b => fmtMoney(b)).join(" + ")})</span>}
                 </span>
-                <span style={{ flex: 1.5, textAlign: "right", color: p.cashout !== null ? "#2a0a08" : "#7a5030" }}>
-                  {p.cashout !== null ? fmtMoney(p.cashout) : "—"}
-                  {isAdmin && p.cashout !== null && <button onClick={() => undoCashout(p.id)} style={{ ...S.tinyBtn, marginLeft: 4, color: "#450206" }} title="Undo">↺</button>}
+                <span style={{ flex: 1.5, textAlign: "right", color: p.cashout !== null ? "#2a0a08" : "#7a5030", display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 4 }}>
+                  {p.cashout !== null ? (
+                    <>
+                      {fmtMoney(p.cashout)}
+                      {isAdmin && <button onClick={() => undoCashout(p.id)} style={{ ...S.tinyBtn, color: "#450206" }} title="Undo">↺</button>}
+                    </>
+                  ) : !isAdmin ? "—" : cashoutId === p.id ? (
+                    <>
+                      <input
+                        autoFocus
+                        style={S.cashoutInput}
+                        type="number"
+                        inputMode="decimal"
+                        step="any"
+                        min="0"
+                        placeholder="0"
+                        value={cashoutVal}
+                        onChange={e => setCashoutVal(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") saveCashout(p.id); if (e.key === "Escape") { setCashoutId(null); setCashoutVal(""); } }}
+                      />
+                      <button onClick={() => saveCashout(p.id)} style={{ ...S.tinyBtn, opacity: 1, color: "#450206", fontSize: 16 }} title="Save">✓</button>
+                    </>
+                  ) : (
+                    <button onClick={() => { setCashoutId(p.id); setCashoutVal(""); }} style={S.cashoutDash} title="Cash out">—</button>
+                  )}
                 </span>
                 <span style={{ flex: 1.5, textAlign: "right", fontWeight: 600, color: profit !== null ? profitColor(profit) : "#707070" }}>
                   {profit !== null ? fmt(profit) : "—"}
@@ -151,6 +189,25 @@ export default function ActiveView({ session, isAdmin, updateSession, setModal, 
         </div>
       ) : (
         <div style={S.empty}><p style={{ color: "#707070" }}>Add players to get started</p></div>
+      )}
+
+      {session.log?.length > 0 && (
+        <div style={S.logWrap}>
+          <button onClick={() => setShowLog(v => !v)} style={S.logToggle}>
+            <span>Activity Log · {session.log.length}</span>
+            <span>{showLog ? "▾" : "▸"}</span>
+          </button>
+          {showLog && (
+            <div style={S.logList}>
+              {[...session.log].reverse().map((e, i) => (
+                <div key={i} style={S.logRow}>
+                  <span style={S.logTime}>{new Date(e.t).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</span>
+                  <span style={S.logText}>{logLabel(e)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {session.players.length > 0 && isAdmin && (

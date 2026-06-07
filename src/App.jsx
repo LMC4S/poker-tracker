@@ -76,7 +76,7 @@ function AppContent({ isAdmin }) {
   }, []);
 
   const startNewSession = (name) => {
-    const s = { id: uid(), name: name || `Session ${sessions.length + 1}`, date: new Date().toISOString(), players: [], ended: false, shareToken: crypto.randomUUID() };
+    const s = { id: uid(), name: name || `Session ${sessions.length + 1}`, date: new Date().toISOString(), players: [], log: [], ended: false, shareToken: crypto.randomUUID() };
     setSessions(prev => [s, ...prev]);
     setActiveId(s.id);
     setView("active");

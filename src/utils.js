@@ -23,6 +23,24 @@ export const fmtMoney = (n) => {
 
 export const profitColor = () => "#2a0a08";
 
+// Appends a timestamped event to a session's log (mutates & returns the session)
+export const logEvent = (s, type, player, amount) => {
+  s.log = [...(s.log || []), { t: new Date().toISOString(), type, player, ...(amount != null ? { amount } : {}) }];
+  return s;
+};
+
+// Human-readable description of a log entry
+export const logLabel = (e) => {
+  switch (e.type) {
+    case "join":    return e.amount ? `${e.player} joined · ${fmtMoney(e.amount)}` : `${e.player} joined`;
+    case "buyin":   return `${e.player} rebuy · ${fmtMoney(e.amount)}`;
+    case "cashout": return `${e.player} cashed out · ${fmtMoney(e.amount)}`;
+    case "undo":    return `${e.player} cash-out undone`;
+    case "remove":  return `${e.player} removed`;
+    default:        return e.player;
+  }
+};
+
 // Interpolates red(r=-1) → beige(r=0) → green(r=+1), matching app palette
 export const corrColor = (r) => {
   if (r === null) return "#e8d8c0";

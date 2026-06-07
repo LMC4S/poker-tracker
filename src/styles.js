@@ -60,6 +60,14 @@ export const S = {
   select: { width: "100%", padding: "12px 14px", background: "#fbf0df", border: "1px solid #d4b898", borderRadius: 8, color: "#2a0a08", fontSize: 16, marginBottom: 10, outline: "none", boxSizing: "border-box" },
   modalBtn: { width: "100%", padding: "12px", background: "#450206", color: "#ffffff", border: "none", borderRadius: 24, fontSize: 12, fontWeight: 700, cursor: "pointer", letterSpacing: "2px", textTransform: "uppercase", fontFamily: F },
   modalBtnAlt: { width: "100%", padding: "12px", background: "#fbf0df", color: "#450206", border: "1px solid #d4b898", borderRadius: 24, fontSize: 12, fontWeight: 600, cursor: "pointer", letterSpacing: "1px", textTransform: "uppercase", fontFamily: F },
+  cashoutInput: { width: 60, padding: "3px 6px", background: "#fbf0df", border: "1px solid #450206", borderRadius: 6, color: "#2a0a08", fontSize: 14, outline: "none", textAlign: "right", fontFamily: FB, fontVariantNumeric: "lining-nums tabular-nums" },
+  cashoutDash: { background: "none", border: "1px dashed #c4a880", borderRadius: 6, padding: "2px 10px", color: "#7a5030", fontSize: 14, cursor: "pointer", fontFamily: FB },
+  logWrap: { marginTop: 16 },
+  logToggle: { width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 14px", background: "#f0e0c4", border: "1px solid #d4b898", borderRadius: 10, fontSize: 10, fontWeight: 700, color: "#7a5030", letterSpacing: 1.5, textTransform: "uppercase", cursor: "pointer", fontFamily: F },
+  logList: { marginTop: 8, background: "#f0e0c4", border: "1px solid #d4b898", borderRadius: 10, overflow: "hidden", maxHeight: 260, overflowY: "auto" },
+  logRow: { display: "flex", gap: 10, padding: "9px 14px", fontSize: 14, borderBottom: "1px solid rgba(212,184,152,0.5)", alignItems: "baseline" },
+  logTime: { color: "#7a5030", fontSize: 11, fontFamily: F, letterSpacing: 0.5, whiteSpace: "nowrap", minWidth: 64, fontVariantNumeric: "lining-nums tabular-nums" },
+  logText: { color: "#2a0a08", flex: 1 },
 };
 
 if (typeof document !== "undefined") {

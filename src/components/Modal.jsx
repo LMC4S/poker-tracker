@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { uid, fmtMoney } from "../utils";
+import { uid, logEvent } from "../utils";
 import { S } from "../styles";
 
 export default function Modal({ modal, setModal, sessions, activeSession, updateSession, startNewSession, activeId }) {
   const close = () => setModal(null);
   const [val, setVal] = useState("");
-  const [val2, setVal2] = useState(modal.type === "cashout" ? "" : "20");
+  const [val2, setVal2] = useState("20");
   const [selectedPlayer, setSelectedPlayer] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [lastAdded, setLastAdded] = useState(null);
@@ -27,7 +27,7 @@ export default function Modal({ modal, setModal, sessions, activeSession, update
     updateSession(activeId, s => {
       if (s.players.find(p => p.name.toLowerCase() === name.toLowerCase())) return s;
       s.players.push({ id: uid(), name, buyins: amount > 0 ? [amount] : [], cashout: null });
-      return s;
+      return logEvent(s, "join", name, amount > 0 ? amount : null);
     });
     setVal(""); setVal2("20"); setShowSuggestions(false);
     setLastAdded(name);
@@ -41,24 +41,11 @@ export default function Modal({ modal, setModal, sessions, activeSession, update
     if (!selectedPlayer || !amount || amount <= 0) return;
     updateSession(activeId, s => {
       const p = s.players.find(x => x.id === selectedPlayer);
-      if (p) p.buyins.push(amount);
+      if (p) { p.buyins.push(amount); return logEvent(s, "buyin", p.name, amount); }
       return s;
     });
     setVal2(""); close();
   };
-
-  const handleCashout = () => {
-    const amount = parseFloat(val2);
-    if (!selectedPlayer || isNaN(amount) || amount < 0) return;
-    updateSession(activeId, s => {
-      const p = s.players.find(x => x.id === selectedPlayer);
-      if (p) p.cashout = amount;
-      return s;
-    });
-    setVal2(""); close();
-  };
-
-  const activePlayers = players.filter(p => p.cashout === null);
 
   const frequentPlayers = useMemo(() => {
     const currentNames = new Set(players.map(p => p.name.toLowerCase()));
@@ -144,17 +131,6 @@ export default function Modal({ modal, setModal, sessions, activeSession, update
             </select>
             <input ref={inputRef} style={S.input} placeholder="Amount" type="number" inputMode="decimal" step="any" min="0" value={val2} onChange={e => setVal2(e.target.value)} onKeyDown={e => e.key === "Enter" && handleBuyin()} />
             <button onClick={handleBuyin} style={S.modalBtn}>Rebuy</button>
-          </>
-        )}
-        {modal.type === "cashout" && (
-          <>
-            <h3 style={S.modalTitle}>Cash Out</h3>
-            <select style={S.select} value={selectedPlayer} onChange={e => setSelectedPlayer(e.target.value)}>
-              <option value="">Select player</option>
-              {activePlayers.map(p => <option key={p.id} value={p.id}>{p.name} ({fmtMoney(p.buyins.reduce((a, x) => a + x, 0))} in)</option>)}
-            </select>
-            <input ref={inputRef} style={S.input} placeholder="Cash out amount" type="number" inputMode="decimal" step="any" min="0" value={val2} onChange={e => setVal2(e.target.value)} onKeyDown={e => e.key === "Enter" && handleCashout()} />
-            <button onClick={handleCashout} style={S.modalBtn}>Cash Out</button>
           </>
         )}
       </div>
