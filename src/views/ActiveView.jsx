@@ -41,8 +41,7 @@ export default function ActiveView({ session, isAdmin, updateSession, setModal, 
     <div style={S.content}>
       <div style={S.sessionHeader}>
         <h2 style={S.sessionName}>{session.name}</h2>
-        <div style={S.sessionMeta}>{new Date(session.date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} · {session.players.length} players</div>
-        <div style={S.sessionTimer}>● Running {fmtDuration(Date.now() - new Date(session.date).getTime())}</div>
+        <div style={S.sessionMeta}>{new Date(session.date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} · {session.players.length} players · ● Running {fmtDuration(Date.now() - new Date(session.date).getTime())}</div>
       </div>
 
       <div style={S.actions}>

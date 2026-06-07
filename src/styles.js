@@ -53,7 +53,6 @@ export const S = {
   modalBtn: { width: "100%", padding: "12px", background: "#450206", color: "#ffffff", border: "none", borderRadius: 24, fontSize: 12, fontWeight: 700, cursor: "pointer", letterSpacing: "2px", textTransform: "uppercase", fontFamily: F },
   modalBtnAlt: { width: "100%", padding: "12px", background: "#fbf0df", color: "#450206", border: "1px solid #d4b898", borderRadius: 24, fontSize: 12, fontWeight: 600, cursor: "pointer", letterSpacing: "1px", textTransform: "uppercase", fontFamily: F },
   cashoutDash: { background: "none", border: "1px dashed #c4a880", borderRadius: 6, padding: "2px 10px", color: "#7a5030", fontSize: 14, cursor: "pointer", fontFamily: FB },
-  sessionTimer: { fontSize: 11, color: "#7a5030", marginTop: 4, letterSpacing: "0.5px", fontVariantNumeric: "lining-nums tabular-nums" },
   logWrap: { marginTop: 16 },
   logToggle: { width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 14px", background: "#f0e0c4", border: "1px solid #d4b898", borderRadius: 10, fontSize: 10, fontWeight: 700, color: "#7a5030", letterSpacing: 1.5, textTransform: "uppercase", cursor: "pointer", fontFamily: F },
   logList: { marginTop: 8, background: "#f0e0c4", border: "1px solid #d4b898", borderRadius: 10, overflow: "hidden", maxHeight: 260, overflowY: "auto" },
