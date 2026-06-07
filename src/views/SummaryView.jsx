@@ -43,8 +43,7 @@ export default function SummaryView({ session, isAdmin, onResume, onBack, onDele
         <div style={S.summaryHeader}>
           <div>
             <h2 style={S.summaryTitle}>{session.name}</h2>
-            <div style={S.summarySub}>{dateStr}</div>
-            {durationStr && <div style={{ ...S.summarySub, marginTop: 2 }}>{durationStr}</div>}
+            <div style={S.summarySub}>{dateStr}{durationStr && ` · ${durationStr}`}</div>
           </div>
         </div>
         <div style={{ ...S.summaryTable, marginTop: 16 }}>
