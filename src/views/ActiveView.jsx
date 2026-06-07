@@ -4,10 +4,11 @@ import { handleShare } from "../share";
 import { S, F } from "../styles";
 import { PlusIcon, TrashIcon } from "../components/icons";
 import StatBox from "../components/StatBox";
-import CopyLinkButton from "../components/CopyLinkButton";
+import QRModal from "../components/QRModal";
 
 export default function ActiveView({ session, isAdmin, updateSession, setModal, onEnd }) {
   const [confirmingId, setConfirmingId] = useState(null);
+  const [showQR, setShowQR] = useState(false);
   const totalBuyins = session.players.reduce((a, p) => a + p.buyins.reduce((b, x) => b + x, 0), 0);
   const totalCashouts = session.players.filter(p => p.cashout !== null).reduce((a, p) => a + p.cashout, 0);
   const cashedOutCount = session.players.filter(p => p.cashout !== null).length;
@@ -92,8 +93,8 @@ export default function ActiveView({ session, isAdmin, updateSession, setModal, 
         {isAdmin && <button onClick={() => setModal({ type: "addPlayer" })} style={S.actionBtn}><PlusIcon size={16}/> Add Player</button>}
         {isAdmin && <button onClick={() => setModal({ type: "buyin" })} style={S.actionBtnAlt}>Rebuy</button>}
         {isAdmin && <button onClick={() => setModal({ type: "cashout" })} style={S.actionBtnAlt}>Cash Out</button>}
-        {session.players.length > 0 && <button onClick={() => handleShare(cardRef)} style={S.actionBtnAlt}>Share</button>}
-        <CopyLinkButton token={session.shareToken} />
+        {session.shareToken && <button onClick={() => setShowQR(true)} style={S.actionBtnAlt}>QR Code</button>}
+        {showQR && <QRModal session={session} onClose={() => setShowQR(false)} />}
       </div>
 
       {session.players.length > 0 ? (

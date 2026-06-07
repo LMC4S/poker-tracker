@@ -3,11 +3,12 @@ import { fmtMoney, fmt, profitColor } from "../utils";
 import { handleShare } from "../share";
 import { S, F } from "../styles";
 import { ChevronIcon } from "../components/icons";
-import CopyLinkButton from "../components/CopyLinkButton";
+import QRModal from "../components/QRModal";
 
 export default function SummaryView({ session, isAdmin, onResume, onBack, onDelete }) {
   const shareRef = useRef(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showQR, setShowQR] = useState(false);
 
   const sorted = [...session.players].sort((a, b) => {
     const pa = a.cashout !== null ? a.cashout - a.buyins.reduce((s, x) => s + x, 0) : -Infinity;
@@ -117,8 +118,8 @@ export default function SummaryView({ session, isAdmin, onResume, onBack, onDele
       <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
         <button onClick={onBack} style={S.actionBtnAlt}><ChevronIcon dir="left" size={14}/> Home</button>
         {isAdmin && session.ended && <button onClick={onResume} style={S.actionBtnAlt}>Reopen Session</button>}
-        <button onClick={() => handleShare(shareRef)} style={S.actionBtnAlt}>Share</button>
-        <CopyLinkButton token={session.shareToken} />
+        {session.shareToken && <button onClick={() => setShowQR(true)} style={S.actionBtnAlt}>QR Code</button>}
+        {showQR && <QRModal session={session} onClose={() => setShowQR(false)} />}
       </div>
 
       {isAdmin && (
