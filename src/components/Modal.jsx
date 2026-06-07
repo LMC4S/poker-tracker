@@ -109,7 +109,7 @@ export default function Modal({ modal, setModal, sessions, activeSession, update
                     <button
                       key={name}
                       tabIndex={-1}
-                      onClick={() => { setVal(name); document.getElementById("buyin-input")?.focus(); }}
+                      onClick={() => setVal(name)}
                       style={val.toLowerCase() === name.toLowerCase() ? { ...S.chip, ...S.chipActive } : S.chip}
                     >
                       {name}
