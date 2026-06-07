@@ -7,7 +7,6 @@ export default function Modal({ modal, setModal, sessions, activeSession, update
   const [val, setVal] = useState("");
   const [val2, setVal2] = useState(modal.type === "cashout" ? "" : "20");
   const [selectedPlayer, setSelectedPlayer] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [lastAdded, setLastAdded] = useState(null);
   const [confirmVisible, setConfirmVisible] = useState(false);
   const inputRef = useRef(null);
@@ -29,7 +28,7 @@ export default function Modal({ modal, setModal, sessions, activeSession, update
       s.players.push({ id: uid(), name, buyins: amount > 0 ? [amount] : [], cashout: null });
       return logEvent(s, "join", name, amount > 0 ? amount : null);
     });
-    setVal(""); setVal2("20"); setShowSuggestions(false);
+    setVal(""); setVal2("20");
     setLastAdded(name);
     setConfirmVisible(true);
     setTimeout(() => setConfirmVisible(false), 1200);
@@ -84,9 +83,9 @@ export default function Modal({ modal, setModal, sessions, activeSession, update
           </>
         )}
         {modal.type === "addPlayer" && (() => {
-          const filtered = val
+          const filtered = (val
             ? frequentPlayers.filter(n => n.toLowerCase().includes(val.toLowerCase()))
-            : frequentPlayers;
+            : frequentPlayers).slice(0, 10);
           return (
             <>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
@@ -95,38 +94,29 @@ export default function Modal({ modal, setModal, sessions, activeSession, update
                   ✓ {lastAdded} added
                 </div>
               </div>
-              <div style={{ position: "relative", marginBottom: 10 }}>
-                <input
-                  ref={inputRef}
-                  style={{ ...S.input, marginBottom: 0, paddingRight: 40 }}
-                  placeholder="Search or type new"
-                  value={val}
-                  onChange={e => { setVal(e.target.value); setShowSuggestions(true); }}
-                  onKeyDown={e => e.key === "Enter" && (val2 ? handleAddPlayer() : document.getElementById("buyin-input")?.focus())}
-                  onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                  autoComplete="nope"
-                />
-                {frequentPlayers.length > 0 && (
-                  <button
-                    tabIndex={-1}
-                    onMouseDown={e => { e.preventDefault(); setShowSuggestions(s => !s); }}
-                    style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 48, background: "none", border: "none", cursor: "pointer", color: "#7a5030", fontSize: 28, display: "flex", alignItems: "center", justifyContent: "center" }}
-                  >▾</button>
-                )}
-                {showSuggestions && filtered.length > 0 && (
-                  <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#fbf0df", border: "1px solid #d4b898", borderRadius: 8, zIndex: 10, maxHeight: 180, overflowY: "auto", boxShadow: "0 4px 12px rgba(42,10,8,0.15)" }}>
-                    {filtered.map(name => (
-                      <div
-                        key={name}
-                        onMouseDown={e => { e.preventDefault(); setVal(name); setShowSuggestions(false); }}
-                        style={{ padding: "12px 14px", fontSize: 16, color: "#2a0a08", borderBottom: "1px solid rgba(212,184,152,0.5)", cursor: "pointer" }}
-                      >
-                        {name}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <input
+                ref={inputRef}
+                style={S.input}
+                placeholder="Search or type new name"
+                value={val}
+                onChange={e => setVal(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && (val2 ? handleAddPlayer() : document.getElementById("buyin-input")?.focus())}
+                autoComplete="off"
+              />
+              {filtered.length > 0 && (
+                <div style={S.chipRow}>
+                  {filtered.map(name => (
+                    <button
+                      key={name}
+                      tabIndex={-1}
+                      onClick={() => { setVal(name); document.getElementById("buyin-input")?.focus(); }}
+                      style={val.toLowerCase() === name.toLowerCase() ? { ...S.chip, ...S.chipActive } : S.chip}
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              )}
               <input id="buyin-input" style={S.input} placeholder="Initial buy-in" type="number" step="any" min="0" value={val2} onChange={e => setVal2(e.target.value)} onKeyDown={e => e.key === "Enter" && handleAddPlayer()} />
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={handleAddPlayer} style={{ ...S.modalBtn, flex: 1 }}>Add Player</button>
