@@ -12,7 +12,7 @@ Self-hosted web app for tracking buy-ins, cashouts, and balances during a home p
 
 ## How sharing works
 
-Each session has its own link of the form `https://<app>.vercel.app/s/<token>`. The host taps **QR Code** on an active session and players scan it with their phone camera — no app install needed.
+Each session has its own link of the form `https://<app>.vercel.app/s/<token>`. The host taps **QR Code** on an active session and players scan it with their phone to view an active session. 
 
 - Anyone with the link sees that one session, read-only, refreshed every few seconds. The link stays valid after the session ends and shows final standings.
 - The shared view has two tabs: **Session** (the linked game) and **Home** (series stats across all games — aggregate numbers only, no per-player history).
