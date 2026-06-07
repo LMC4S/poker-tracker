@@ -47,7 +47,7 @@ export default function ActiveView({ session, isAdmin, updateSession, setModal, 
       <div style={S.actions}>
         {isAdmin && <button onClick={() => setModal({ type: "addPlayer" })} style={S.actionBtn}><PlusIcon size={16}/> Add Player</button>}
         {isAdmin && <button onClick={() => setModal({ type: "buyin" })} style={S.actionBtnAlt}>Rebuy</button>}
-        {session.shareToken && <button onClick={() => setShowQR(true)} style={S.actionBtnAlt}>QR Code</button>}
+        {isAdmin && session.shareToken && <button onClick={() => setShowQR(true)} style={S.actionBtnAlt}>QR Code</button>}
         {showQR && <QRModal session={session} onClose={() => setShowQR(false)} />}
       </div>
 

@@ -74,7 +74,7 @@ export default function SummaryView({ session, isAdmin, onResume, onBack, onDele
       <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
         <button onClick={onBack} style={S.actionBtnAlt}><ChevronIcon dir="left" size={14}/> Home</button>
         {isAdmin && session.ended && <button onClick={onResume} style={S.actionBtnAlt}>Reopen Session</button>}
-        {session.shareToken && <button onClick={() => setShowQR(true)} style={S.actionBtnAlt}>QR Code</button>}
+        {isAdmin && session.shareToken && <button onClick={() => setShowQR(true)} style={S.actionBtnAlt}>QR Code</button>}
         {showQR && <QRModal session={session} onClose={() => setShowQR(false)} />}
       </div>
 
