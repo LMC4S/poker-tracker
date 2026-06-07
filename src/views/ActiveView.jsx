@@ -54,11 +54,11 @@ export default function ActiveView({ session, isAdmin, updateSession, setModal, 
       {session.players.length > 0 ? (
         <div style={S.table}>
           <div style={S.tableHead}>
-            <span style={{ flex: 2 }}>Player</span>
-            <span style={{ flex: 2, textAlign: "right" }}>Buy-in</span>
-            <span style={{ flex: 1.5, textAlign: "right" }}>Cash Out</span>
-            <span style={{ flex: 1.5, textAlign: "right" }}>Net</span>
-            <span style={{ flex: 0.5 }}/>
+            <span style={{ flex: 1.4 }}>Player</span>
+            <span style={{ flex: 1.7, textAlign: "right" }}>Buy-in</span>
+            <span style={{ flex: 1.7, textAlign: "right" }}>Cash Out</span>
+            <span style={{ flex: 1.7, textAlign: "right" }}>Net</span>
+            <span style={{ flex: 0.4 }}/>
           </div>
           {session.players.map(p => {
             const totalBuyin = p.buyins.reduce((a, x) => a + x, 0);
@@ -77,12 +77,12 @@ export default function ActiveView({ session, isAdmin, updateSession, setModal, 
 
             return (
               <div key={p.id} style={S.tableRow}>
-                <span style={{ flex: 2, fontWeight: 600, color: "#2a0a08" }}>{p.name}</span>
-                <span style={{ flex: 2, textAlign: "right", color: "#2a0a08" }}>
-                  {fmtMoney(totalBuyin)}
-                  {p.buyins.length > 1 && <span style={{ color: "#7a5030", fontSize: 11, marginLeft: 4 }}>({p.buyins.map(b => fmtMoney(b)).join(" + ")})</span>}
+                <span style={{ flex: 1.4, minWidth: 0, fontWeight: 600, color: "#2a0a08", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+                <span style={{ flex: 1.7, display: "flex", flexDirection: "column", alignItems: "flex-end", color: "#2a0a08" }}>
+                  <span>{fmtMoney(totalBuyin)}</span>
+                  {p.buyins.length > 1 && <span style={{ color: "#7a5030", fontSize: 11, marginTop: 1, lineHeight: 1.2 }}>{p.buyins.map(b => fmtMoney(b)).join(" + ")}</span>}
                 </span>
-                <span style={{ flex: 1.5, textAlign: "right", color: p.cashout !== null ? "#2a0a08" : "#7a5030", display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 4 }}>
+                <span style={{ flex: 1.7, textAlign: "right", color: p.cashout !== null ? "#2a0a08" : "#7a5030", display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 4 }}>
                   {p.cashout !== null ? (
                     <>
                       {fmtMoney(p.cashout)}
@@ -92,21 +92,21 @@ export default function ActiveView({ session, isAdmin, updateSession, setModal, 
                     <button onClick={() => setModal({ type: "cashout", playerId: p.id })} style={S.cashoutDash} title="Cash out">—</button>
                   )}
                 </span>
-                <span style={{ flex: 1.5, textAlign: "right", fontWeight: 600, color: profit !== null ? profitColor(profit) : "#707070" }}>
+                <span style={{ flex: 1.7, textAlign: "right", fontWeight: 600, color: profit !== null ? profitColor(profit) : "#707070" }}>
                   {profit !== null ? fmt(profit) : "—"}
                 </span>
-                <span style={{ flex: 0.5, textAlign: "right" }}>
+                <span style={{ flex: 0.4, textAlign: "right" }}>
                   {isAdmin && p.cashout === null && <button onClick={() => setConfirmingId(p.id)} style={S.tinyBtn}><TrashIcon size={12} color="#707070"/></button>}
                 </span>
               </div>
             );
           })}
           <div style={S.tableTotal}>
-            <span style={{ flex: 2, fontWeight: 700 }}>Total</span>
-            <span style={{ flex: 2, textAlign: "right", fontWeight: 700 }}>{fmtMoney(totalBuyins)}</span>
-            <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700 }}>{cashedOutCount > 0 ? fmtMoney(totalCashouts) : "—"}</span>
-            <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700, color: allCashedOut ? profitColor(balance) : "#707070" }}>{allCashedOut ? fmt(balance) : "—"}</span>
-            <span style={{ flex: 0.5 }}/>
+            <span style={{ flex: 1.4, fontWeight: 700 }}>Total</span>
+            <span style={{ flex: 1.7, textAlign: "right", fontWeight: 700 }}>{fmtMoney(totalBuyins)}</span>
+            <span style={{ flex: 1.7, textAlign: "right", fontWeight: 700 }}>{cashedOutCount > 0 ? fmtMoney(totalCashouts) : "—"}</span>
+            <span style={{ flex: 1.7, textAlign: "right", fontWeight: 700, color: allCashedOut ? profitColor(balance) : "#707070" }}>{allCashedOut ? fmt(balance) : "—"}</span>
+            <span style={{ flex: 0.4 }}/>
           </div>
         </div>
       ) : (
