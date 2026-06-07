@@ -23,6 +23,24 @@ export const fmtMoney = (n) => {
 
 export const profitColor = () => "#2a0a08";
 
+// "1h 22m" / "47m" from a millisecond span
+export const fmtDuration = (ms) => {
+  const mins = Math.max(0, Math.round(ms / 60000));
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return h ? `${h}h ${m}m` : `${m}m`;
+};
+
+const TIME_OPTS = { hour: "numeric", minute: "2-digit" };
+export const fmtTime = (iso) => new Date(iso).toLocaleTimeString(undefined, TIME_OPTS);
+
+// Derives a session's endDate from the latest cash-out still in effect (mutates & returns).
+// Players forget to hit "End Session", so the real end time is when the last player cashed out.
+export const recomputeEndDate = (s) => {
+  const times = s.players.filter(p => p.cashout !== null && p.cashoutAt).map(p => p.cashoutAt).sort();
+  s.endDate = times.length ? times[times.length - 1] : null;
+  return s;
+};
+
 // Appends a timestamped event to a session's log (mutates & returns the session)
 export const logEvent = (s, type, player, amount) => {
   s.log = [...(s.log || []), { t: new Date().toISOString(), type, player, ...(amount != null ? { amount } : {}) }];

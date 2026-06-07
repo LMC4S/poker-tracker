@@ -83,7 +83,8 @@ function AppContent({ isAdmin }) {
   };
 
   const endSession = (id) => {
-    updateSession(id, s => ({ ...s, ended: true, endDate: new Date().toISOString() }));
+    // endDate is auto-derived from the last cash-out; only fall back to now if nobody cashed out
+    updateSession(id, s => ({ ...s, ended: true, endDate: s.endDate || new Date().toISOString() }));
     setSummaryId(id);
     setView("summary");
   };

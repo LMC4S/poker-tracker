@@ -1,109 +1,48 @@
-import { useRef, useState } from "react";
-import { fmtMoney, fmt, profitColor, logEvent, logLabel } from "../utils";
-import { handleShare } from "../share";
+import { useState, useEffect } from "react";
+import { fmtMoney, fmt, profitColor, logEvent, logLabel, fmtDuration, recomputeEndDate } from "../utils";
 import { S, F } from "../styles";
 import { PlusIcon, TrashIcon } from "../components/icons";
-import StatBox from "../components/StatBox";
 import QRModal from "../components/QRModal";
 
 export default function ActiveView({ session, isAdmin, updateSession, setModal, onEnd }) {
   const [confirmingId, setConfirmingId] = useState(null);
   const [showQR, setShowQR] = useState(false);
-  const [cashoutId, setCashoutId] = useState(null);
-  const [cashoutVal, setCashoutVal] = useState("");
   const [showLog, setShowLog] = useState(false);
+  const [, setTick] = useState(0);
+  // Re-render every 30s so the running-session clock stays current
+  useEffect(() => {
+    const t = setInterval(() => setTick(n => n + 1), 30000);
+    return () => clearInterval(t);
+  }, []);
   const totalBuyins = session.players.reduce((a, p) => a + p.buyins.reduce((b, x) => b + x, 0), 0);
   const totalCashouts = session.players.filter(p => p.cashout !== null).reduce((a, p) => a + p.cashout, 0);
   const cashedOutCount = session.players.filter(p => p.cashout !== null).length;
   const allCashedOut = session.players.length > 0 && cashedOutCount === session.players.length;
   const balance = allCashedOut ? totalCashouts - totalBuyins : null;
-  const cardRef = useRef(null);
 
   const removePlayer = (pid) => {
     updateSession(session.id, s => {
       const p = s.players.find(x => x.id === pid);
       const next = { ...s, players: s.players.filter(x => x.id !== pid) };
-      return p ? logEvent(next, "remove", p.name) : next;
+      if (p) logEvent(next, "remove", p.name);
+      return recomputeEndDate(next);
     });
   };
 
   const undoCashout = (pid) => {
     updateSession(session.id, s => {
       const p = s.players.find(x => x.id === pid);
-      if (p) { p.cashout = null; return logEvent(s, "undo", p.name); }
+      if (p) { p.cashout = null; p.cashoutAt = null; logEvent(s, "undo", p.name); return recomputeEndDate(s); }
       return s;
     });
   };
-
-  const saveCashout = (pid) => {
-    const amount = parseFloat(cashoutVal);
-    if (isNaN(amount) || amount < 0) return;
-    updateSession(session.id, s => {
-      const p = s.players.find(x => x.id === pid);
-      if (p) { p.cashout = amount; return logEvent(s, "cashout", p.name, amount); }
-      return s;
-    });
-    setCashoutId(null); setCashoutVal("");
-  };
-
-  const dateStr = new Date(session.date).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
-  const sorted = [...session.players].sort((a, b) => {
-    const pa = a.cashout !== null ? a.cashout - a.buyins.reduce((s, x) => s + x, 0) : -Infinity;
-    const pb = b.cashout !== null ? b.cashout - b.buyins.reduce((s, x) => s + x, 0) : -Infinity;
-    return pb - pa;
-  });
 
   return (
     <div style={S.content}>
-      {/* Hidden share card */}
-      <div ref={cardRef} style={{ position: "absolute", left: -9999, top: 0, width: 420 }}>
-        <div style={S.summaryCard}>
-          <div style={S.summaryHeader}>
-            <div>
-              <h2 style={S.summaryTitle}>{/^Session \d+$/.test(session.name) ? dateStr : session.name}</h2>
-              <div style={S.summarySub}>{/^Session \d+$/.test(session.name) ? "" : dateStr}</div>
-            </div>
-          </div>
-          <div style={{ ...S.summaryTable, paddingTop: 14 }}>
-            <div style={S.summaryTableHead}>
-              <span style={{ flex: 0.4, textAlign: "center" }}>#</span>
-              <span style={{ flex: 2 }}>Player</span>
-              <span style={{ flex: 1.5, textAlign: "right" }}>Buy-in</span>
-              <span style={{ flex: 1.5, textAlign: "right" }}>Cash Out</span>
-              <span style={{ flex: 1.5, textAlign: "right" }}>Net</span>
-            </div>
-            {sorted.map((p, i) => {
-              const totalBuyin = p.buyins.reduce((a, x) => a + x, 0);
-              const profit = p.cashout !== null ? p.cashout - totalBuyin : null;
-              return (
-                <div key={p.id} style={S.summaryTableRow}>
-                  <span style={{ flex: 0.4, textAlign: "center", color: "#7a5030", fontSize: 12 }}>{i + 1}</span>
-                  <span style={{ flex: 2, fontWeight: 600, color: "#2a0a08" }}>{p.name}</span>
-                  <span data-num="1" style={{ flex: 1.5, textAlign: "right", color: "#2a0a08" }}>{fmtMoney(totalBuyin)}</span>
-                  <span data-num="1" style={{ flex: 1.5, textAlign: "right", color: "#2a0a08" }}>{p.cashout !== null ? fmtMoney(p.cashout) : "—"}</span>
-                  <span data-num="1" style={{ flex: 1.5, textAlign: "right", fontWeight: 700, color: profitColor(profit), fontSize: 15 }}>{profit !== null ? fmt(profit) : "—"}</span>
-                </div>
-              );
-            })}
-            <div style={S.summaryTableTotalRow}>
-              <span style={{ flex: 0.4 }}/>
-              <span style={{ flex: 2, fontWeight: 700 }}>Total</span>
-              <span data-num="1" style={{ flex: 1.5, textAlign: "right", fontWeight: 700 }}>{fmtMoney(totalBuyins)}</span>
-              <span data-num="1" style={{ flex: 1.5, textAlign: "right", fontWeight: 700 }}>{cashedOutCount > 0 ? fmtMoney(totalCashouts) : "—"}</span>
-              <span style={{ flex: 1.5, textAlign: "right", fontWeight: 700 }}>—</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div style={S.sessionHeader}>
         <h2 style={S.sessionName}>{session.name}</h2>
         <div style={S.sessionMeta}>{new Date(session.date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} · {session.players.length} players</div>
-      </div>
-
-      <div style={S.statsRow}>
-        <StatBox label="Total Buy-in" value={fmtMoney(totalBuyins)} />
-        {allCashedOut && <StatBox label="Balance" value={balance === 0 ? "✓ OK" : fmt(balance)} color="#ffffff" />}
+        <div style={S.sessionTimer}>● Running {fmtDuration(Date.now() - new Date(session.date).getTime())}</div>
       </div>
 
       <div style={S.actions}>
@@ -150,24 +89,8 @@ export default function ActiveView({ session, isAdmin, updateSession, setModal, 
                       {fmtMoney(p.cashout)}
                       {isAdmin && <button onClick={() => undoCashout(p.id)} style={{ ...S.tinyBtn, color: "#450206" }} title="Undo">↺</button>}
                     </>
-                  ) : !isAdmin ? "—" : cashoutId === p.id ? (
-                    <>
-                      <input
-                        autoFocus
-                        style={S.cashoutInput}
-                        type="number"
-                        inputMode="decimal"
-                        step="any"
-                        min="0"
-                        placeholder="0"
-                        value={cashoutVal}
-                        onChange={e => setCashoutVal(e.target.value)}
-                        onKeyDown={e => { if (e.key === "Enter") saveCashout(p.id); if (e.key === "Escape") { setCashoutId(null); setCashoutVal(""); } }}
-                      />
-                      <button onClick={() => saveCashout(p.id)} style={{ ...S.tinyBtn, opacity: 1, color: "#450206", fontSize: 16 }} title="Save">✓</button>
-                    </>
-                  ) : (
-                    <button onClick={() => { setCashoutId(p.id); setCashoutVal(""); }} style={S.cashoutDash} title="Cash out">—</button>
+                  ) : !isAdmin ? "—" : (
+                    <button onClick={() => setModal({ type: "cashout", playerId: p.id })} style={S.cashoutDash} title="Cash out">—</button>
                   )}
                 </span>
                 <span style={{ flex: 1.5, textAlign: "right", fontWeight: 600, color: profit !== null ? profitColor(profit) : "#707070" }}>

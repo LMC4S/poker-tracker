@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { uid, logEvent } from "../utils";
+import { uid, logEvent, recomputeEndDate } from "../utils";
 import { S } from "../styles";
 
 export default function Modal({ modal, setModal, sessions, activeSession, updateSession, startNewSession, activeId }) {
   const close = () => setModal(null);
   const [val, setVal] = useState("");
-  const [val2, setVal2] = useState("20");
+  const [val2, setVal2] = useState(modal.type === "cashout" ? "" : "20");
   const [selectedPlayer, setSelectedPlayer] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [lastAdded, setLastAdded] = useState(null);
@@ -46,6 +46,19 @@ export default function Modal({ modal, setModal, sessions, activeSession, update
     });
     setVal2(""); close();
   };
+
+  const handleCashout = () => {
+    const amount = parseFloat(val2);
+    if (isNaN(amount) || amount < 0) return;
+    updateSession(activeId, s => {
+      const p = s.players.find(x => x.id === modal.playerId);
+      if (p) { p.cashout = amount; p.cashoutAt = new Date().toISOString(); logEvent(s, "cashout", p.name, amount); return recomputeEndDate(s); }
+      return s;
+    });
+    setVal2(""); close();
+  };
+
+  const cashoutPlayer = modal.type === "cashout" ? players.find(p => p.id === modal.playerId) : null;
 
   const frequentPlayers = useMemo(() => {
     const currentNames = new Set(players.map(p => p.name.toLowerCase()));
@@ -131,6 +144,13 @@ export default function Modal({ modal, setModal, sessions, activeSession, update
             </select>
             <input ref={inputRef} style={S.input} placeholder="Amount" type="number" inputMode="decimal" step="any" min="0" value={val2} onChange={e => setVal2(e.target.value)} onKeyDown={e => e.key === "Enter" && handleBuyin()} />
             <button onClick={handleBuyin} style={S.modalBtn}>Rebuy</button>
+          </>
+        )}
+        {modal.type === "cashout" && (
+          <>
+            <h3 style={S.modalTitle}>Cash Out · {cashoutPlayer?.name}</h3>
+            <input ref={inputRef} style={{ ...S.input, fontSize: 22, textAlign: "center", padding: "16px 14px" }} placeholder="Amount" type="number" inputMode="decimal" step="any" min="0" value={val2} onChange={e => setVal2(e.target.value)} onKeyDown={e => e.key === "Enter" && handleCashout()} />
+            <button onClick={handleCashout} style={S.modalBtn}>Confirm</button>
           </>
         )}
       </div>
