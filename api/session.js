@@ -80,7 +80,12 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: error.message });
   }
 
-  const sessions = data ? JSON.parse(data.value) : [];
+  let sessions = [];
+  if (data) {
+    try { sessions = JSON.parse(data.value); } catch {
+      return res.status(500).json({ error: "Stored data is corrupted" });
+    }
+  }
   const session = sessions.find(s => s.shareToken === token);
   if (!session) {
     return res.status(404).json({ error: "Not found" });

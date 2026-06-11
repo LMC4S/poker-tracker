@@ -25,6 +25,7 @@ Each session has its own link of the form `https://<app>.vercel.app/s/<token>`. 
 - Timestamped activity log for every buy-in, rebuy, and cash-out
 - Session end time recorded automatically from the last cash-out
 - Series stats across all games — sessions played, typical buy-in, longest session, biggest swing
+- Conflict-safe saves — concurrent admin devices can't overwrite each other, failed saves retry with a visible warning, and the server keeps snapshots of the last 20 saves
 - One-click JSON backup of all data
 - Mobile-first layout
 - Runs on the Vercel and Supabase free tiers

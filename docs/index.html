@@ -192,9 +192,9 @@ vite.config.js         Dev server opens /admin</code></pre>
 
     <h2 id="schema">Database schema</h2>
 <pre><code><span class="tok-k">create table</span> poker_data (
-  key        text <span class="tok-k">primary key</span>,
+  key        text <span class="tok-k">primary key</span>,  <span class="tok-c">-- main blob + snapshot rows (poker-sessions-v2:snap:*)</span>
   value      text <span class="tok-k">not null</span>,   <span class="tok-c">-- JSON.stringify(Session[])</span>
-  updated_at text
+  updated_at text                <span class="tok-c">-- doubles as the optimistic-concurrency version token</span>
 );
 
 <span class="tok-k">alter table</span> poker_data <span class="tok-k">enable row level security</span>;
@@ -231,14 +231,15 @@ vite.config.js         Dev server opens /admin</code></pre>
 
     <div class="endpoint">
       <span class="method get">GET</span><span class="route">/api/sessions</span>
-      <p>Returns the full session array. <b>Header:</b> <code>x-admin-secret</code>.</p>
+      <p>Returns the full session array. <b>Header:</b> <code>x-admin-secret</code>. The <code>X-Data-Version</code> response header carries the stored row's <code>updated_at</code>, used as the version token for saves.</p>
       <p><b>Responses:</b> <code>200 Session[]</code> · <code>401</code> bad/missing secret · <code>500</code></p>
     </div>
 
     <div class="endpoint">
       <span class="method post">POST</span><span class="route">/api/sessions</span>
-      <p>Overwrites the full session array (the client sends the whole array on each save). <b>Header:</b> <code>x-admin-secret</code>. <b>Body:</b> <code>Session[]</code>.</p>
-      <p><b>Responses:</b> <code>200 { "ok": true }</code> · <code>401</code> · <code>400</code> bad body · <code>500</code></p>
+      <p>Overwrites the full session array (the client sends the whole array on each save). <b>Headers:</b> <code>x-admin-secret</code>, plus <code>x-base-version</code> — the version the client loaded. If another device saved since (stored version no longer matches), the write is rejected with <code>409</code> carrying the current data, instead of clobbering it. Clients that omit <code>x-base-version</code> (old cached bundles) keep last-write-wins. <b>Body:</b> <code>Session[]</code>, shape-validated; an empty array is refused when it would wipe more than one stored session.</p>
+      <p>Before each overwrite the previous blob is copied to a snapshot row (<code>poker-sessions-v2:snap:&lt;version&gt;</code>, last 20 kept), so any bad write is recoverable from the SQL editor.</p>
+      <p><b>Responses:</b> <code>200 { "ok": true, "version": "&lt;new&gt;" }</code> · <code>409 { sessions, version }</code> stale base version · <code>401</code> · <code>400</code> bad/invalid body or refused wipe · <code>500</code></p>
     </div>
 
     <div class="endpoint">
@@ -260,8 +261,8 @@ vite.config.js         Dev server opens /admin</code></pre>
     <h3>Admin (<code>AppContent</code> in App.jsx)</h3>
     <ul>
       <li><b>Load:</b> on mount, fetch sessions; backfill <code>shareToken</code> on any session missing one.</li>
-      <li><b>Save:</b> writes are debounced 300ms; the whole array is POSTed on any change.</li>
-      <li><b>Sync:</b> 5-second polling keeps multiple admin devices in sync. Polling is skipped while a save is pending or in flight (avoids clobbering local edits) and pauses when the tab is hidden.</li>
+      <li><b>Save:</b> writes are debounced 300ms; the whole array is POSTed on any change with the <code>x-base-version</code> token. Failed saves show a banner and retry every 3s; a <code>409</code> conflict adopts the server copy and tells the user to re-check their last entry.</li>
+      <li><b>Sync:</b> 5-second polling keeps multiple admin devices in sync. Polling is skipped while a save is pending or in flight, re-checked <i>after</i> the response arrives (a poll snapshot must not overwrite an edit made while it was downloading), and pauses when the tab is hidden.</li>
       <li><b>Views:</b> <code>home</code> (HomeView), <code>active</code> (ActiveView), <code>summary</code> (SummaryView). Mutations go through a single <code>updateSession(id, fn)</code> reducer.</li>
     </ul>
     <h3>Observer (ShareApp.jsx)</h3>

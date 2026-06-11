@@ -1,5 +1,5 @@
 {
-  "ignoreCommand": "git diff HEAD^ HEAD --quiet -- src/ api/ public/ package.json vite.config.* vercel.json",
+  "ignoreCommand": "git diff HEAD^ HEAD --quiet -- src/ api/ public/ index.html package.json package-lock.json vite.config.* vercel.json",
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
