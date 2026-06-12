@@ -17,10 +17,12 @@ Each session has its own link of the form `https://<app>.vercel.app/s/<token>`. 
 - Anyone with the link sees that one session, read-only, refreshed every few seconds. The link stays valid after the session ends and shows final standings.
 - The shared view has two tabs: **Session** (the linked game) and **Home** (series stats across all games — aggregate numbers only, no per-player history).
 - The root URL (`/`, no token) shows only a prompt to open a shared link. No session list is exposed publicly.
+- The host can **revoke** a session's link or **replace** it with a new one from the QR Code dialog. Revoking immediately invalidates the old link and any saved QR codes.
 
 ## Features
 
 - Per-session share links with a scannable QR code — players follow a session live in any mobile browser, with no app install
+- Share links can be revoked or replaced per session at any time
 - Buy-ins, rebuys, tap-to-cash-out, and undo, with player-name autocomplete from past games
 - Timestamped activity log for every buy-in, rebuy, and cash-out
 - Session end time recorded automatically from the last cash-out

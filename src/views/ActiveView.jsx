@@ -4,7 +4,7 @@ import { S, F } from "../styles";
 import { PlusIcon, TrashIcon } from "../components/icons";
 import QRModal from "../components/QRModal";
 
-export default function ActiveView({ session, isAdmin, updateSession, setModal, onEnd }) {
+export default function ActiveView({ session, isAdmin, updateSession, setModal, onEnd, onRevoke, onRegenerate }) {
   const [confirmingId, setConfirmingId] = useState(null);
   const [showQR, setShowQR] = useState(false);
   const [showLog, setShowLog] = useState(false);
@@ -47,8 +47,9 @@ export default function ActiveView({ session, isAdmin, updateSession, setModal, 
       <div style={S.actions}>
         {isAdmin && <button onClick={() => setModal({ type: "addPlayer" })} style={S.actionBtn}><PlusIcon size={16}/> Add Player</button>}
         {isAdmin && <button onClick={() => setModal({ type: "buyin" })} style={S.actionBtnAlt}>Rebuy</button>}
-        {isAdmin && session.shareToken && <button onClick={() => setShowQR(true)} style={S.actionBtnAlt}>QR Code</button>}
-        {showQR && <QRModal session={session} onClose={() => setShowQR(false)} />}
+        {/* Shown even when the link is revoked — the modal is where a new one is created */}
+        {isAdmin && <button onClick={() => setShowQR(true)} style={S.actionBtnAlt}>QR Code</button>}
+        {showQR && <QRModal session={session} onClose={() => setShowQR(false)} onRevoke={onRevoke} onRegenerate={onRegenerate} />}
       </div>
 
       {session.players.length > 0 ? (

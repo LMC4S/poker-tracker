@@ -4,7 +4,7 @@ import { S, F } from "../styles";
 import { ChevronIcon } from "../components/icons";
 import QRModal from "../components/QRModal";
 
-export default function SummaryView({ session, isAdmin, onResume, onBack, onDelete }) {
+export default function SummaryView({ session, isAdmin, onResume, onBack, onDelete, onRevoke, onRegenerate }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showQR, setShowQR] = useState(false);
 
@@ -73,8 +73,9 @@ export default function SummaryView({ session, isAdmin, onResume, onBack, onDele
       <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
         <button onClick={onBack} style={S.actionBtnAlt}><ChevronIcon dir="left" size={14}/> Home</button>
         {isAdmin && session.ended && <button onClick={onResume} style={S.actionBtnAlt}>Reopen Session</button>}
-        {isAdmin && session.shareToken && <button onClick={() => setShowQR(true)} style={S.actionBtnAlt}>QR Code</button>}
-        {showQR && <QRModal session={session} onClose={() => setShowQR(false)} />}
+        {/* Shown even when the link is revoked — the modal is where a new one is created */}
+        {isAdmin && <button onClick={() => setShowQR(true)} style={S.actionBtnAlt}>QR Code</button>}
+        {showQR && <QRModal session={session} onClose={() => setShowQR(false)} onRevoke={onRevoke} onRegenerate={onRegenerate} />}
       </div>
 
       {isAdmin && (

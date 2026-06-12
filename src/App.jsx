@@ -171,9 +171,9 @@ function AppContent({ isAdmin }) {
         </div>
       )}
       <Header view={view} setView={setView} activeId={activeId} isAdmin={isAdmin} />
-      {view === "home"    && <HomeView sessions={sessions} isAdmin={isAdmin} onNew={() => setModal({ type: "newSession" })} onOpen={openSession} onRevoke={revokeShare} onRegenerate={regenerateShare} />}
-      {view === "active"  && activeSession  && <ActiveView session={activeSession} isAdmin={isAdmin} updateSession={updateSession} setModal={setModal} onEnd={() => endSession(activeId)} />}
-      {view === "summary" && summarySession && <SummaryView session={summarySession} isAdmin={isAdmin} onResume={() => resumeSession(summaryId)} onBack={() => setView("home")} onDelete={deleteSession} />}
+      {view === "home"    && <HomeView sessions={sessions} isAdmin={isAdmin} onNew={() => setModal({ type: "newSession" })} onOpen={openSession} />}
+      {view === "active"  && activeSession  && <ActiveView session={activeSession} isAdmin={isAdmin} updateSession={updateSession} setModal={setModal} onEnd={() => endSession(activeId)} onRevoke={revokeShare} onRegenerate={regenerateShare} />}
+      {view === "summary" && summarySession && <SummaryView session={summarySession} isAdmin={isAdmin} onResume={() => resumeSession(summaryId)} onBack={() => setView("home")} onDelete={deleteSession} onRevoke={revokeShare} onRegenerate={regenerateShare} />}
       {isAdmin && modal && <Modal modal={modal} setModal={setModal} sessions={sessions} activeSession={activeSession} updateSession={updateSession} startNewSession={startNewSession} activeId={activeId} />}
     </div>
   );

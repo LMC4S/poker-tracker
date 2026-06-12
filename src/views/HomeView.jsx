@@ -1,18 +1,14 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { S, F } from "../styles";
 import { fmtMoney, fmt, exportJSON } from "../utils";
 import { PlusIcon } from "../components/icons";
 import SessionCard from "../components/SessionCard";
-import QRModal from "../components/QRModal";
 
-export default function HomeView({ sessions, isAdmin, onNew, onOpen, onRevoke, onRegenerate, precomputedStats, seriesOnly = false }) {
+export default function HomeView({ sessions, isAdmin, onNew, onOpen, precomputedStats, seriesOnly = false }) {
   // The homepage is admin-only, so the full history is shown (share viewers
   // only ever see their own session via /s/<token>)
   const activeSessions = sessions.filter(s => !s.ended);
   const endedSessions = sessions.filter(s => s.ended).sort((a, b) => new Date(b.date) - new Date(a.date));
-  const [qrId, setQrId] = useState(null);
-  const qrSession = sessions.find(s => s.id === qrId);
-  const onShare = isAdmin ? setQrId : undefined;
 
   const seriesStats = useMemo(() => {
     if (precomputedStats) return precomputedStats;
@@ -103,14 +99,18 @@ export default function HomeView({ sessions, isAdmin, onNew, onOpen, onRevoke, o
       {!seriesOnly && activeSessions.length > 0 && (
         <div style={S.section}>
           <h3 style={S.sectionTitle}>Active</h3>
-          {activeSessions.map(s => <SessionCard key={s.id} session={s} isAdmin={isAdmin} onClick={() => onOpen(s.id)} onShare={onShare} />)}
+          {activeSessions.map(s => <SessionCard key={s.id} session={s} isAdmin={isAdmin} onClick={() => onOpen(s.id)} />)}
         </div>
       )}
 
       {!seriesOnly && endedSessions.length > 0 && (
         <div style={S.section}>
           <h3 style={S.sectionTitle}>History</h3>
-          {endedSessions.map(s => <SessionCard key={s.id} session={s} isAdmin={isAdmin} onClick={() => onOpen(s.id)} onShare={onShare} />)}
+          {/* Fixed-height scroll area: the page itself must not grow with the
+              history, so New Session / Backup stay reachable at the bottom */}
+          <div style={{ maxHeight: "min(45vh, 380px)", overflowY: "auto", WebkitOverflowScrolling: "touch", paddingRight: 4 }}>
+            {endedSessions.map(s => <SessionCard key={s.id} session={s} isAdmin={isAdmin} onClick={() => onOpen(s.id)} />)}
+          </div>
         </div>
       )}
 
@@ -122,10 +122,6 @@ export default function HomeView({ sessions, isAdmin, onNew, onOpen, onRevoke, o
       )}
 
       {isAdmin && <button onClick={onNew} style={{ ...S.newBtn, marginTop: 32 }}><PlusIcon size={20}/> New Session</button>}
-
-      {isAdmin && qrSession && (
-        <QRModal session={qrSession} onClose={() => setQrId(null)} onRevoke={onRevoke} onRegenerate={onRegenerate} />
-      )}
 
       {isAdmin && sessions.length > 0 && (
         <div style={{ marginTop: 16, paddingBottom: 8, textAlign: "center" }}>

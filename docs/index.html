@@ -134,14 +134,14 @@ src/
     Header.jsx         Title + tab nav (showNav toggle)
     Modal.jsx          Add player / rebuy / cashout dialogs
     SessionCard.jsx    Session list item (admin home)
-    QRModal.jsx        QR code for a session's /s/&lt;token&gt; link
+    QRModal.jsx        QR code for a session's /s/&lt;token&gt; link + revoke/replace link
     icons.jsx          Inline SVG icons
   views/
     HomeView.jsx       Series stats + session lists (seriesOnly flag)
     ActiveView.jsx     Live session table + admin actions + activity log
     SummaryView.jsx    Ended session summary + delete/reopen/QR
 supabase/migrations/   SQL (init + per-session-share)
-vercel.json            SPA rewrites
+vercel.json            SPA rewrites + security headers
 vite.config.js         Dev server opens /admin</code></pre>
 
     <h2 id="model">Data model</h2>
@@ -153,7 +153,7 @@ vite.config.js         Dev server opens /admin</code></pre>
   date: <span class="tok-s">string</span>,         <span class="tok-c">// ISO 8601, session start</span>
   endDate?: <span class="tok-s">string</span>,     <span class="tok-c">// ISO 8601, last cash-out time (fallback: End Session time)</span>
   ended: <span class="tok-k">boolean</span>,
-  shareToken: <span class="tok-s">string</span>,   <span class="tok-c">// crypto.randomUUID(), the public link key</span>
+  shareToken: <span class="tok-s">string</span> | <span class="tok-k">null</span>, <span class="tok-c">// crypto.randomUUID(), the public link key; null = revoked</span>
   players: Player[],
   log: LogEntry[]          <span class="tok-c">// append-only activity history</span>
 }
@@ -174,7 +174,7 @@ vite.config.js         Dev server opens /admin</code></pre>
   player: <span class="tok-s">string</span>,       <span class="tok-c">// player name</span>
   amount?: <span class="tok-k">number</span>       <span class="tok-c">// for join / buyin / cashout</span>
 }</code></pre>
-    <p><b>Derived values</b> (computed, never stored): a player's net is <code>cashout − sum(buyins)</code>. A session balances when total cashouts equal total buy-ins. <code>endDate</code> is recomputed from the latest <code>cashoutAt</code> on every cash-out, undo, and player removal (so a forgotten "End Session" tap doesn't corrupt the recorded end time); it falls back to the End Session time only if nobody cashed out. <code>shareToken</code> is assigned on session creation and backfilled onto any token-less session when the admin app loads.</p>
+    <p><b>Derived values</b> (computed, never stored): a player's net is <code>cashout − sum(buyins)</code>. A session balances when total cashouts equal total buy-ins. <code>endDate</code> is recomputed from the latest <code>cashoutAt</code> on every cash-out, undo, and player removal (so a forgotten "End Session" tap doesn't corrupt the recorded end time); it falls back to the End Session time only if nobody cashed out. <code>shareToken</code> is assigned on session creation and backfilled onto sessions that predate the share feature (field absent) when the admin app loads. <code>null</code> means the admin revoked the link and is preserved as-is; the QR dialog can revoke a link or replace it with a fresh token at any time.</p>
 
     <h2 id="storage">Storage &amp; keys</h2>
     <h3>Server (Postgres)</h3>
@@ -212,7 +212,7 @@ vite.config.js         Dev server opens /admin</code></pre>
       <li><code>/admin</code> &rarr; <code>&lt;PinGate&gt;</code> wrapping <code>&lt;AppContent&gt;</code></li>
       <li>anything else &rarr; <code>&lt;ShareApp&gt;</code>, which parses <code>/s/&lt;token&gt;</code> with <code>/^\/s\/(.+)$/</code>. No token &rarr; the "use a shared link" prompt.</li>
     </ul>
-    <p><a href="../vercel.json">vercel.json</a> makes the SPA work on hard navigation: serverless functions resolve first, then every other path falls back to <code>index.html</code>.</p>
+    <p><a href="../vercel.json">vercel.json</a> makes the SPA work on hard navigation: serverless functions resolve first, then every other path falls back to <code>index.html</code>. It also attaches security headers to every response (see <a href="#security">Security model</a>).</p>
 <pre><code>{
   <span class="tok-s">"rewrites"</span>: [
     { <span class="tok-s">"source"</span>: <span class="tok-s">"/api/:path*"</span>, <span class="tok-s">"destination"</span>: <span class="tok-s">"/api/:path*"</span> },
@@ -233,7 +233,7 @@ vite.config.js         Dev server opens /admin</code></pre>
 
     <div class="endpoint">
       <span class="method get">GET</span><span class="route">/api/sessions</span>
-      <p>Returns the full session array. <b>Header:</b> <code>x-admin-secret</code>. The <code>X-Data-Version</code> response header carries the stored row's <code>updated_at</code>, used as the version token for saves.</p>
+      <p>Returns the full session array. <b>Header:</b> <code>x-admin-secret</code>. The <code>X-Data-Version</code> response header carries the stored row's <code>updated_at</code>, used as the version token for saves. All <code>/api/sessions</code> responses are <code>Cache-Control: no-store</code> — admin data is never cached.</p>
       <p><b>Responses:</b> <code>200 Session[]</code> · <code>401</code> bad/missing secret · <code>500</code></p>
     </div>
 
@@ -247,6 +247,7 @@ vite.config.js         Dev server opens /admin</code></pre>
     <div class="endpoint">
       <span class="method get">GET</span><span class="route">/api/session?token=&lt;uuid&gt;</span>
       <p>Public, unauthenticated. Looks up one session by <code>shareToken</code> and returns it with computed aggregate stats. No way to list or enumerate sessions.</p>
+      <p><b>Caching:</b> responses are edge-cached per URL via <code>Cache-Control</code> — live sessions <code>s-maxage=5</code> (one origin hit per poll window no matter how many viewers), ended sessions <code>s-maxage=300</code>, unknown tokens <code>s-maxage=15</code> (so spraying bad tokens mostly hits the cache instead of invoking the function and reading the database). Consequence: a revoked link can keep serving from cache briefly — seconds for a live session, up to ~5 minutes for an ended one.</p>
       <p><b>Responses:</b> <code>200 { session: Session, seriesStats: {...} }</code> · <code>404</code> unknown token · <code>400</code> missing token · <code>405</code> non-GET · <code>500</code></p>
     </div>
 
@@ -262,17 +263,19 @@ vite.config.js         Dev server opens /admin</code></pre>
     <h2 id="frontend">Frontend architecture</h2>
     <h3>Admin (<code>AppContent</code> in App.jsx)</h3>
     <ul>
-      <li><b>Load:</b> on mount, fetch sessions; backfill <code>shareToken</code> on any session missing one.</li>
+      <li><b>Load:</b> on mount, fetch sessions; backfill <code>shareToken</code> on sessions that predate the share feature (field absent). A <code>null</code> token means the link was revoked and is left alone.</li>
       <li><b>Save:</b> writes are debounced 300ms; the whole array is POSTed on any change with the <code>x-base-version</code> token. Failed saves show a banner and retry every 3s; a <code>409</code> conflict adopts the server copy and tells the user to re-check their last entry.</li>
       <li><b>Sync:</b> 5-second polling keeps multiple admin devices in sync. Polling is skipped while a save is pending or in flight, re-checked <i>after</i> the response arrives (a poll snapshot must not overwrite an edit made while it was downloading), and pauses when the tab is hidden.</li>
       <li><b>Views:</b> <code>home</code> (HomeView), <code>active</code> (ActiveView), <code>summary</code> (SummaryView). Mutations go through a single <code>updateSession(id, fn)</code> reducer.</li>
+      <li><b>Home layout:</b> the admin homepage lists the entire ended-session history inside a fixed-height scroll area (<code>min(45vh, 380px)</code>), so the page itself stays compact and New Session / Backup remain reachable without scrolling past the history.</li>
+      <li><b>Share-link management:</b> the <b>QR Code</b> button in ActiveView and SummaryView opens QRModal, which besides the QR offers <b>Revoke Link</b> (sets <code>shareToken</code> to <code>null</code>) and <b>New Link</b> (fresh <code>crypto.randomUUID()</code>), each behind an inline confirm. The button shows even when the link is revoked — the modal is where a new one is created.</li>
     </ul>
     <h3>Observer (ShareApp.jsx)</h3>
     <ul>
       <li>Parses the token from the URL once on mount; fetches <code>/api/session?token=</code> and polls every 5s (paused when hidden).</li>
       <li>Two tabs via Header: <b>Session</b> (default — renders ActiveView or SummaryView depending on <code>ended</code>) and <b>Home</b> (HomeView with <code>seriesOnly</code> and <code>precomputedStats</code>).</li>
       <li>All write handlers are no-ops; <code>isAdmin=false</code> hides every mutating control.</li>
-      <li>States: <code>loading</code>, <code>ok</code>, <code>notfound</code> (invalid/expired link), <code>nolink</code> (root prompt).</li>
+      <li>States: <code>loading</code>, <code>ok</code>, <code>notfound</code> (invalid or revoked link), <code>nolink</code> (root prompt).</li>
     </ul>
 
     <h2 id="stats">Series stats</h2>
@@ -308,7 +311,9 @@ vite.config.js         Dev server opens /admin</code></pre>
       <li><b>Single writer.</b> The only write path is <code>POST /api/sessions</code>, gated by <code>x-admin-secret</code>. Observers have no write endpoint at all.</li>
       <li><b>No enumeration.</b> <code>GET /api/session</code> returns exactly one session matched by token; there is no list endpoint reachable without the admin secret.</li>
       <li><b>Constant-time comparisons</b> for both the PIN hash and the API secret (<code>timingSafeEqual</code>).</li>
-      <li><b>Token capability.</b> A <code>shareToken</code> is a bearer capability: anyone with the link can read that one session. Tokens are <code>crypto.randomUUID()</code> (122 bits), not guessable or enumerable.</li>
+      <li><b>Token capability.</b> A <code>shareToken</code> is a bearer capability: anyone with the link can read that one session. Tokens are <code>crypto.randomUUID()</code> (122 bits), not guessable or enumerable. The admin can revoke or replace a session's token from the QR dialog; old links then 404 (after the edge cache TTL — seconds live, up to ~5 minutes ended).</li>
+      <li><b>Security headers.</b> <a href="../vercel.json">vercel.json</a> sets a Content-Security-Policy (own origin + Google Fonts + Vercel Analytics, <code>frame-ancestors 'none'</code>), <code>X-Frame-Options</code>, <code>X-Content-Type-Options</code>, <code>Referrer-Policy: no-referrer</code> (share tokens ride in the URL path), and HSTS on every response. The CSP's main job is making a future XSS bug unable to exfiltrate the localStorage admin secret.</li>
+      <li><b>Cost bounding.</b> <code>/api/session</code> is the only unauthenticated endpoint; edge caching (above) bounds how many function invocations and database reads a hostile client can force.</li>
       <li><b>Brute force (known limitation).</b> The 5-attempt lockout is client-side UX, not a security boundary — <code>/api/auth</code> itself accepts unlimited attempts. Online-guessing protection relies on platform-level rate limiting (e.g. a Vercel firewall rule) and a strong <code>ADMIN_PIN</code>.</li>
       <li><b>Secret lifetime (known limitation).</b> The admin secret is a static bearer token held in localStorage with no expiry or logout. Revoking a device that once logged in means rotating <code>ADMIN_API_SECRET</code> in Vercel.</li>
     </ul>
