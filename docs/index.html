@@ -83,6 +83,7 @@
       <a href="#frontend">Frontend</a>
       <a href="#stats">Series stats</a>
       <div class="grp">Ops</div>
+      <a href="#concurrency">Concurrency &amp; recovery</a>
       <a href="#security">Security model</a>
       <a href="#env">Environment</a>
       <a href="#build">Build</a>
@@ -177,10 +178,11 @@ vite.config.js         Dev server opens /admin</code></pre>
 
     <h2 id="storage">Storage &amp; keys</h2>
     <h3>Server (Postgres)</h3>
-    <p>One table, one row. The functions read/write the row keyed by a constant:</p>
+    <p>One table. The live data is a single row keyed by a constant; every overwrite also leaves a snapshot row (see <a href="#concurrency">Concurrency &amp; recovery</a>):</p>
     <table>
-      <tr><th>Key constant</th><th>Value</th></tr>
-      <tr><td><code>DATA_KEY = "poker-sessions-v2"</code></td><td>row in <code>poker_data.value</code> holding <code>JSON.stringify(Session[])</code></td></tr>
+      <tr><th>Key</th><th>Value</th></tr>
+      <tr><td><code>DATA_KEY = "poker-sessions-v2"</code></td><td>live row in <code>poker_data.value</code> holding <code>JSON.stringify(Session[])</code></td></tr>
+      <tr><td><code>poker-sessions-v2:snap:&lt;version&gt;</code></td><td>snapshot of the previous blob, written before each save; the 20 most recent are kept</td></tr>
     </table>
     <h3>Client (localStorage)</h3>
     <table>
@@ -281,6 +283,25 @@ vite.config.js         Dev server opens /admin</code></pre>
     </ul>
     <p>Fields: <code>sessionsThisYear</code>, <code>typicalBuyin</code> (median buy-in), <code>longestSession</code> (h/m from date→endDate), <code>biggestWin</code>, <code>biggestLoss</code>, <code>thisYear</code>. All derived only from <code>ended</code> sessions.</p>
 
+    <h2 id="concurrency">Concurrency &amp; recovery</h2>
+    <p>The whole history is one JSON blob, so every save is a full overwrite — the failure mode to engineer against is a stale client clobbering a newer copy. Three layers handle it:</p>
+    <ol>
+      <li><b>Optimistic concurrency.</b> The live row's <code>updated_at</code> doubles as an opaque version token: <code>GET /api/sessions</code> returns it in <code>X-Data-Version</code>, the client echoes it on save in <code>x-base-version</code>, and the write is a compare-and-swap on that value. A stale base gets <code>409</code> plus the current data; the client adopts the server copy and shows a "check your last entry" notice. <b>Server wins — there is no merge.</b> The user re-enters at most their last action, which is the right trade at this scale.</li>
+      <li><b>Validation.</b> POST bodies are shape-checked, and an empty array is refused while more than one session is stored — deleting sessions one at a time can never produce that write; only bogus client state can.</li>
+      <li><b>Snapshots.</b> Before each overwrite, the previous blob is copied to a <code>:snap:</code> row (last 20 kept). Any bad write — whatever the cause — is recoverable from the SQL Editor:</li>
+    </ol>
+<pre><code><span class="tok-c">-- list snapshots, newest first</span>
+<span class="tok-k">select</span> key, length(value) <span class="tok-k">from</span> poker_data
+<span class="tok-k">where</span> key <span class="tok-k">like</span> <span class="tok-s">'poker-sessions-v2:snap:%'</span> <span class="tok-k">order by</span> key <span class="tok-k">desc</span>;
+
+<span class="tok-c">-- restore one; a fresh updated_at makes polling clients pick it up</span>
+<span class="tok-c">-- (the token is only ever compared for equality, so any unique string works)</span>
+<span class="tok-k">update</span> poker_data
+  <span class="tok-k">set</span> value = (<span class="tok-k">select</span> value <span class="tok-k">from</span> poker_data <span class="tok-k">where</span> key = <span class="tok-s">'&lt;snap key from above&gt;'</span>),
+      updated_at = now()::text
+<span class="tok-k">where</span> key = <span class="tok-s">'poker-sessions-v2'</span>;</code></pre>
+    <p>The in-app <b>Backup Data</b> button is an export only — it downloads the current <code>Session[]</code> as JSON. There is no import path; restoring a backup file is the same <code>update</code> with the file's contents as <code>value</code>.</p>
+
     <h2 id="security">Security model</h2>
     <ul>
       <li><b>No client DB credential.</b> The bundle contains no Supabase key. <code>poker_data</code> RLS denies all anon access; only the server-side <code>service_role</code> key can touch it.</li>
@@ -288,6 +309,8 @@ vite.config.js         Dev server opens /admin</code></pre>
       <li><b>No enumeration.</b> <code>GET /api/session</code> returns exactly one session matched by token; there is no list endpoint reachable without the admin secret.</li>
       <li><b>Constant-time comparisons</b> for both the PIN hash and the API secret (<code>timingSafeEqual</code>).</li>
       <li><b>Token capability.</b> A <code>shareToken</code> is a bearer capability: anyone with the link can read that one session. Tokens are <code>crypto.randomUUID()</code> (122 bits), not guessable or enumerable.</li>
+      <li><b>Brute force (known limitation).</b> The 5-attempt lockout is client-side UX, not a security boundary — <code>/api/auth</code> itself accepts unlimited attempts. Online-guessing protection relies on platform-level rate limiting (e.g. a Vercel firewall rule) and a strong <code>ADMIN_PIN</code>.</li>
+      <li><b>Secret lifetime (known limitation).</b> The admin secret is a static bearer token held in localStorage with no expiry or logout. Revoking a device that once logged in means rotating <code>ADMIN_API_SECRET</code> in Vercel.</li>
     </ul>
 
     <h2 id="env">Environment variables</h2>
