@@ -95,13 +95,12 @@ export default async function handler(req, res) {
   }
 
   // Vercel's edge caches per-URL: many viewers polling the same link collapse
-  // into one origin hit per window. Live sessions stay near-real-time (the
-  // share page polls every 5s); ended sessions are immutable so cache longer.
+  // into one origin hit per window. TTLs are deliberately short and there is
+  // no stale-while-revalidate — a revoked link must die within seconds, so
+  // the cache lifetime is exactly how long a dead link can keep serving.
   res.setHeader(
     "Cache-Control",
-    session.ended
-      ? "public, s-maxage=300, stale-while-revalidate=600"
-      : "public, s-maxage=5, stale-while-revalidate=25"
+    session.ended ? "public, s-maxage=30" : "public, s-maxage=5"
   );
   return res.status(200).json({ session, seriesStats: computeSeriesStats(sessions) });
 }
