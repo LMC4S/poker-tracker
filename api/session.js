@@ -88,8 +88,20 @@ export default async function handler(req, res) {
   }
   const session = sessions.find(s => s.shareToken === token);
   if (!session) {
+    // Cache misses briefly so a bot spraying bad tokens can't make every
+    // request invoke this function and hit the database
+    res.setHeader("Cache-Control", "public, s-maxage=15");
     return res.status(404).json({ error: "Not found" });
   }
 
+  // Vercel's edge caches per-URL: many viewers polling the same link collapse
+  // into one origin hit per window. Live sessions stay near-real-time (the
+  // share page polls every 5s); ended sessions are immutable so cache longer.
+  res.setHeader(
+    "Cache-Control",
+    session.ended
+      ? "public, s-maxage=300, stale-while-revalidate=600"
+      : "public, s-maxage=5, stale-while-revalidate=25"
+  );
   return res.status(200).json({ session, seriesStats: computeSeriesStats(sessions) });
 }

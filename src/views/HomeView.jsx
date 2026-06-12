@@ -1,12 +1,18 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { S, F } from "../styles";
 import { fmtMoney, fmt, exportJSON } from "../utils";
 import { PlusIcon } from "../components/icons";
 import SessionCard from "../components/SessionCard";
+import QRModal from "../components/QRModal";
 
-export default function HomeView({ sessions, isAdmin, onNew, onOpen, precomputedStats, seriesOnly = false }) {
+export default function HomeView({ sessions, isAdmin, onNew, onOpen, onRevoke, onRegenerate, precomputedStats, seriesOnly = false }) {
+  // The homepage is admin-only, so the full history is shown (share viewers
+  // only ever see their own session via /s/<token>)
   const activeSessions = sessions.filter(s => !s.ended);
-  const recentEnded = sessions.filter(s => s.ended).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 3);
+  const endedSessions = sessions.filter(s => s.ended).sort((a, b) => new Date(b.date) - new Date(a.date));
+  const [qrId, setQrId] = useState(null);
+  const qrSession = sessions.find(s => s.id === qrId);
+  const onShare = isAdmin ? setQrId : undefined;
 
   const seriesStats = useMemo(() => {
     if (precomputedStats) return precomputedStats;
@@ -97,14 +103,14 @@ export default function HomeView({ sessions, isAdmin, onNew, onOpen, precomputed
       {!seriesOnly && activeSessions.length > 0 && (
         <div style={S.section}>
           <h3 style={S.sectionTitle}>Active</h3>
-          {activeSessions.map(s => <SessionCard key={s.id} session={s} isAdmin={isAdmin} onClick={() => onOpen(s.id)} />)}
+          {activeSessions.map(s => <SessionCard key={s.id} session={s} isAdmin={isAdmin} onClick={() => onOpen(s.id)} onShare={onShare} />)}
         </div>
       )}
 
-      {!seriesOnly && recentEnded.length > 0 && (
+      {!seriesOnly && endedSessions.length > 0 && (
         <div style={S.section}>
-          <h3 style={S.sectionTitle}>Recent</h3>
-          {recentEnded.map(s => <SessionCard key={s.id} session={s} isAdmin={isAdmin} onClick={() => onOpen(s.id)} />)}
+          <h3 style={S.sectionTitle}>History</h3>
+          {endedSessions.map(s => <SessionCard key={s.id} session={s} isAdmin={isAdmin} onClick={() => onOpen(s.id)} onShare={onShare} />)}
         </div>
       )}
 
@@ -116,6 +122,10 @@ export default function HomeView({ sessions, isAdmin, onNew, onOpen, precomputed
       )}
 
       {isAdmin && <button onClick={onNew} style={{ ...S.newBtn, marginTop: 32 }}><PlusIcon size={20}/> New Session</button>}
+
+      {isAdmin && qrSession && (
+        <QRModal session={qrSession} onClose={() => setQrId(null)} onRevoke={onRevoke} onRegenerate={onRegenerate} />
+      )}
 
       {isAdmin && sessions.length > 0 && (
         <div style={{ marginTop: 16, paddingBottom: 8, textAlign: "center" }}>

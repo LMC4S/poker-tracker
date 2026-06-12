@@ -38,6 +38,9 @@ function isValidSessions(x) {
 }
 
 export default async function handler(req, res) {
+  // Admin data is per-secret, never cacheable at the edge or in the browser
+  res.setHeader("Cache-Control", "no-store");
+
   const adminSecret = req.headers["x-admin-secret"];
   const expectedSecret = process.env.ADMIN_API_SECRET;
 

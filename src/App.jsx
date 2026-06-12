@@ -35,8 +35,9 @@ function AppContent({ isAdmin }) {
     loadSessions().then(r => {
       if (r !== null) {
         versionRef.current = r.version;
-        // Backfill share tokens for any pre-existing sessions; the save effect persists them
-        setSessions(r.sessions.map(sess => sess.shareToken ? sess : { ...sess, shareToken: crypto.randomUUID() }));
+        // Backfill share tokens for pre-share-feature sessions (no field at all);
+        // null means the admin revoked the link, so leave it off
+        setSessions(r.sessions.map(sess => sess.shareToken !== undefined ? sess : { ...sess, shareToken: crypto.randomUUID() }));
         setSaveEnabled(true);
       }
       setLoaded(true);
@@ -137,6 +138,11 @@ function AppContent({ isAdmin }) {
     if (summaryId === id) { setSummaryId(null); setView("home"); }
   };
 
+  // Revoked links 404 on /api/session (null never matches a token); replacing
+  // generates a fresh token so old links and saved QR codes die immediately
+  const revokeShare = (id) => updateSession(id, s => ({ ...s, shareToken: null }));
+  const regenerateShare = (id) => updateSession(id, s => ({ ...s, shareToken: crypto.randomUUID() }));
+
   const resumeSession = (id) => {
     updateSession(id, s => ({ ...s, ended: false }));
     setActiveId(id);
@@ -165,7 +171,7 @@ function AppContent({ isAdmin }) {
         </div>
       )}
       <Header view={view} setView={setView} activeId={activeId} isAdmin={isAdmin} />
-      {view === "home"    && <HomeView sessions={sessions} isAdmin={isAdmin} onNew={() => setModal({ type: "newSession" })} onOpen={openSession} />}
+      {view === "home"    && <HomeView sessions={sessions} isAdmin={isAdmin} onNew={() => setModal({ type: "newSession" })} onOpen={openSession} onRevoke={revokeShare} onRegenerate={regenerateShare} />}
       {view === "active"  && activeSession  && <ActiveView session={activeSession} isAdmin={isAdmin} updateSession={updateSession} setModal={setModal} onEnd={() => endSession(activeId)} />}
       {view === "summary" && summarySession && <SummaryView session={summarySession} isAdmin={isAdmin} onResume={() => resumeSession(summaryId)} onBack={() => setView("home")} onDelete={deleteSession} />}
       {isAdmin && modal && <Modal modal={modal} setModal={setModal} sessions={sessions} activeSession={activeSession} updateSession={updateSession} startNewSession={startNewSession} activeId={activeId} />}
