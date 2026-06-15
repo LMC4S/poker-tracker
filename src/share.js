@@ -3,8 +3,9 @@ import html2canvas from "html2canvas";
 // Render the visible summary card to a PNG and hand it to the OS share sheet.
 // On iPhone this drops the scoreboard straight into a group chat as an image;
 // on desktop (no Web Share for files) it falls back to a download.
-export async function shareCardImage(node, filename = "poker-session.png") {
+export async function shareCardImage(node, filename = "poker-session.png", opts = {}) {
   if (!node) return;
+  const { hideTitle = false, titleReplacement = "", subReplacement = "" } = opts;
 
   // Make sure the webfonts the card uses are ready before we rasterize.
   try {
@@ -19,6 +20,17 @@ export async function shareCardImage(node, filename = "poker-session.png") {
     backgroundColor: "#f0e0c4", // matches S.summaryCard
     scale: 3,                   // crisp on retina / when zoomed in chat
     useCORS: true,
+    // Rewrite the title in the clone only — the on-screen card is untouched.
+    // Used to keep a generic "Session N" name (and the session count it leaks)
+    // out of the public image.
+    onclone: hideTitle
+      ? (doc) => {
+          const t = doc.querySelector("[data-share-title]");
+          const s = doc.querySelector("[data-share-sub]");
+          if (t) t.textContent = titleReplacement;
+          if (s) s.textContent = subReplacement;
+        }
+      : undefined,
   });
 
   const blob = await new Promise(res => canvas.toBlob(res, "image/png"));

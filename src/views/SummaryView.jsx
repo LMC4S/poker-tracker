@@ -11,13 +11,21 @@ export default function SummaryView({ session, isAdmin, onResume, onBack, onDele
   const [showQR, setShowQR] = useState(false);
   const [sharing, setSharing] = useState(false);
 
+  // Generic auto-names like "Session 29" leak how many games we've played, so
+  // the public image shows the date instead (the duration line is preserved).
+  const isGenericName = /^Session\s+\d+$/i.test(session.name || "");
+
   const onShareImage = async () => {
     if (sharing) return;
     setSharing(true);
     try {
-      const safeName = (session.name || "session").replace(/[^\w-]+/g, "-");
       const safeDate = new Date(session.date).toISOString().slice(0, 10);
-      await shareCardImage(cardRef.current, `${safeName}-${safeDate}.png`);
+      const safeName = isGenericName ? "session" : (session.name || "session").replace(/[^\w-]+/g, "-");
+      await shareCardImage(cardRef.current, `${safeName}-${safeDate}.png`, {
+        hideTitle: isGenericName,
+        titleReplacement: dateStr,
+        subReplacement: durationStr || "",
+      });
     } finally {
       setSharing(false);
     }
@@ -57,11 +65,11 @@ export default function SummaryView({ session, isAdmin, onResume, onBack, onDele
       <div ref={cardRef} style={S.summaryCard}>
         <div style={S.summaryHeader}>
           <div>
-            <h2 style={S.summaryTitle}>{session.name}</h2>
-            <div style={S.summarySub}>{dateStr}{durationStr && ` · ${durationStr}`}</div>
+            <h2 data-share-title style={S.summaryTitle}>{session.name}</h2>
+            <div data-share-sub style={S.summarySub}>{dateStr}{durationStr && ` · ${durationStr}`}</div>
           </div>
         </div>
-        <div style={{ ...S.summaryTable, marginTop: 16 }}>
+        <div style={{ ...S.summaryTable, margin: "16px 12px" }}>
           <div style={S.summaryTableHead}>
             <span style={{ flex: 0.4, textAlign: "center" }}>#</span>
             <span style={{ flex: 1.3 }}>Player</span>
@@ -77,11 +85,6 @@ export default function SummaryView({ session, isAdmin, onResume, onBack, onDele
             <span data-num="1" style={{ flex: 1.7, textAlign: "right", fontWeight: 700 }}>{fmtMoney(totalCashouts)}</span>
             <span data-num="1" style={{ flex: 1.7, textAlign: "right", fontWeight: 700, color: allCashedOut ? profitColor(balance) : "#707070" }}>{allCashedOut ? fmt(balance) : "—"}</span>
           </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 24px 12px" }}>
-          <span style={{ color: "#c4a882", fontSize: 16, lineHeight: 1 }}>❧</span>
-          <div style={{ flex: 1, height: 1, background: "#c4a882", opacity: 0.6 }} />
-          <span style={{ color: "#c4a882", fontSize: 16, lineHeight: 1 }}>☙</span>
         </div>
       </div>
 
