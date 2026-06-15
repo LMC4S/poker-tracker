@@ -20,17 +20,22 @@ export async function shareCardImage(node, filename = "poker-session.png", opts 
     backgroundColor: "#f0e0c4", // matches S.summaryCard
     scale: 3,                   // crisp on retina / when zoomed in chat
     useCORS: true,
-    // Rewrite the title in the clone only — the on-screen card is untouched.
-    // Used to keep a generic "Session N" name (and the session count it leaks)
-    // out of the public image.
-    onclone: hideTitle
-      ? (doc) => {
-          const t = doc.querySelector("[data-share-title]");
-          const s = doc.querySelector("[data-share-sub]");
-          if (t) t.textContent = titleReplacement;
-          if (s) s.textContent = subReplacement;
-        }
-      : undefined,
+    // Mutate the clone only — the on-screen card is untouched.
+    onclone: (doc) => {
+      // Numbers render in an elegant serif on screen; swap them to a plain,
+      // readable sans in the shared image.
+      doc.querySelectorAll("[data-num]").forEach(el => {
+        el.style.fontFamily = "'Inter', sans-serif";
+      });
+      // Keep a generic "Session N" name (and the session count it leaks) out
+      // of the public image by showing the date instead.
+      if (hideTitle) {
+        const t = doc.querySelector("[data-share-title]");
+        const s = doc.querySelector("[data-share-sub]");
+        if (t) t.textContent = titleReplacement;
+        if (s) s.textContent = subReplacement;
+      }
+    },
   });
 
   const blob = await new Promise(res => canvas.toBlob(res, "image/png"));
