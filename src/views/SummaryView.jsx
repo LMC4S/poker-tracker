@@ -1,12 +1,27 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { fmtMoney, fmt, profitColor, fmtDuration, fmtTime } from "../utils";
+import { shareCardImage } from "../share";
 import { S, F } from "../styles";
 import { ChevronIcon } from "../components/icons";
 import QRModal from "../components/QRModal";
 
 export default function SummaryView({ session, isAdmin, onResume, onBack, onDelete, onRevoke, onRegenerate }) {
+  const cardRef = useRef(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showQR, setShowQR] = useState(false);
+  const [sharing, setSharing] = useState(false);
+
+  const onShareImage = async () => {
+    if (sharing) return;
+    setSharing(true);
+    try {
+      const safeName = (session.name || "session").replace(/[^\w-]+/g, "-");
+      const safeDate = new Date(session.date).toISOString().slice(0, 10);
+      await shareCardImage(cardRef.current, `${safeName}-${safeDate}.png`);
+    } finally {
+      setSharing(false);
+    }
+  };
 
   const sorted = [...session.players].sort((a, b) => {
     const pa = a.cashout !== null ? a.cashout - a.buyins.reduce((s, x) => s + x, 0) : -Infinity;
@@ -39,7 +54,7 @@ export default function SummaryView({ session, isAdmin, onResume, onBack, onDele
 
   return (
     <div style={S.content}>
-      <div style={S.summaryCard}>
+      <div ref={cardRef} style={S.summaryCard}>
         <div style={S.summaryHeader}>
           <div>
             <h2 style={S.summaryTitle}>{session.name}</h2>
@@ -71,6 +86,7 @@ export default function SummaryView({ session, isAdmin, onResume, onBack, onDele
       </div>
 
       <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+        <button onClick={onShareImage} disabled={sharing} style={{ ...S.actionBtn, opacity: sharing ? 0.6 : 1 }}>{sharing ? "Preparing…" : "Share Image"}</button>
         <button onClick={onBack} style={S.actionBtnAlt}><ChevronIcon dir="left" size={14}/> Home</button>
         {isAdmin && session.ended && <button onClick={onResume} style={S.actionBtnAlt}>Reopen Session</button>}
         {/* Shown even when the link is revoked — the modal is where a new one is created */}
