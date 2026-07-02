@@ -78,3 +78,22 @@ export function exportJSON(sessions) {
   a.href = url; a.download = `poker_backup_${new Date().toISOString().slice(0, 10)}.json`;
   a.click(); URL.revokeObjectURL(url);
 }
+
+// Reconciles local and server session lists after a version conflict, at
+// whole-session granularity. For a session present on both sides the newer
+// per-session updatedAt stamp wins (a copy never touched locally has no stamp
+// and defers to the server). Sessions only one side knows about are kept —
+// except server copies of sessions deleted in this tab, which stay deleted.
+// This can resurrect a session deleted on another device inside the conflict
+// window; that beats silently losing an entry that was just typed in.
+export const mergeSessions = (local, server, deletedIds) => {
+  const merged = new Map();
+  for (const s of server) {
+    if (!deletedIds.has(s.id)) merged.set(s.id, s);
+  }
+  for (const s of local) {
+    const remote = merged.get(s.id);
+    if (!remote || (s.updatedAt || "") > (remote.updatedAt || "")) merged.set(s.id, s);
+  }
+  return [...merged.values()].sort((a, b) => new Date(b.date) - new Date(a.date));
+};

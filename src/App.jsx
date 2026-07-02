@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { loadSessions, saveSessions } from "./storage";
-import { uid } from "./utils";
+import { uid, mergeSessions } from "./utils";
 import { S } from "./styles";
 import PinGate from "./components/PinGate";
 import Header from "./components/Header";
@@ -29,6 +29,11 @@ function AppContent({ isAdmin }) {
   // Set when sessions state was just replaced with server data, so the save
   // effect doesn't pointlessly upload it right back
   const skipSaveRef = useRef(false);
+  // Ids deleted in this tab, so a conflict merge doesn't resurrect them
+  const deletedIdsRef = useRef(new Set());
+  // Mirror of the latest rendered sessions, readable from async callbacks
+  const sessionsRef = useRef(sessions);
+  sessionsRef.current = sessions;
 
   // Load sessions once after login (hash is in sessionStorage)
   useEffect(() => {
@@ -61,10 +66,18 @@ function AppContent({ isAdmin }) {
         // Clear a failure banner, but let a conflict notice run its full course
         setSyncState(s => s === "error" ? "idle" : s);
       } else if (result.conflict) {
+        // Another writer (usually this user's other device or a stale tab)
+        // saved first. Merge their copy with ours and let the save effect
+        // retry against the fresh version, instead of discarding the entry
+        // the user just made.
         versionRef.current = result.version;
         pendingSaveRef.current = null;
-        setSyncState("conflict");
-        setSessions(result.sessions);
+        const local = sessionsRef.current;
+        const merged = mergeSessions(local, result.sessions, deletedIdsRef.current);
+        // Only announce it when the merge actually pulled in remote changes
+        if (JSON.stringify(merged) !== JSON.stringify(local)) setSyncState("conflict");
+        // Always a fresh array so the save effect re-runs and retries
+        setSessions(prev => mergeSessions(prev, result.sessions, deletedIdsRef.current));
       } else {
         setSyncState("error");
         pendingSaveRef.current = setTimeout(attempt, 3000);
@@ -105,7 +118,10 @@ function AppContent({ isAdmin }) {
     };
     const start = () => { if (!interval) interval = setInterval(poll, 5000); };
     const stop = () => { clearInterval(interval); interval = null; };
-    const onVisibility = () => document.hidden ? stop() : start();
+    // Poll immediately on wake — a tab resumed after hours holds a stale
+    // version token, and waiting a full interval leaves a window where the
+    // user's first edit saves against it and conflicts
+    const onVisibility = () => { if (document.hidden) stop(); else { poll(); start(); } };
     start();
     document.addEventListener("visibilitychange", onVisibility);
     return () => { stop(); document.removeEventListener("visibilitychange", onVisibility); };
@@ -115,11 +131,12 @@ function AppContent({ isAdmin }) {
   const summarySession = sessions.find(s => s.id === summaryId);
 
   const updateSession = useCallback((id, fn) => {
-    setSessions(prev => prev.map(s => s.id === id ? fn({ ...s, players: s.players.map(p => ({ ...p, buyins: [...p.buyins] })) }) : s));
+    // Stamp every mutation so a conflict merge can tell which side is newer
+    setSessions(prev => prev.map(s => s.id === id ? { ...fn({ ...s, players: s.players.map(p => ({ ...p, buyins: [...p.buyins] })) }), updatedAt: new Date().toISOString() } : s));
   }, []);
 
   const startNewSession = (name) => {
-    const s = { id: uid(), name: name || `Session ${sessions.length + 1}`, date: new Date().toISOString(), players: [], log: [], ended: false, shareToken: crypto.randomUUID() };
+    const s = { id: uid(), name: name || `Session ${sessions.length + 1}`, date: new Date().toISOString(), updatedAt: new Date().toISOString(), players: [], log: [], ended: false, shareToken: crypto.randomUUID() };
     setSessions(prev => [s, ...prev]);
     setActiveId(s.id);
     setView("active");
@@ -133,6 +150,7 @@ function AppContent({ isAdmin }) {
   };
 
   const deleteSession = (id) => {
+    deletedIdsRef.current.add(id);
     setSessions(prev => prev.filter(s => s.id !== id));
     if (activeId === id) { setActiveId(null); setView("home"); }
     if (summaryId === id) { setSummaryId(null); setView("home"); }
@@ -167,7 +185,7 @@ function AppContent({ isAdmin }) {
           letterSpacing: "1px", textTransform: "uppercase", whiteSpace: "nowrap",
           boxShadow: "0 4px 16px rgba(42,10,8,0.35)"
         }}>
-          {syncState === "error" ? "Save failed — retrying…" : "Updated from another device — check your last entry"}
+          {syncState === "error" ? "Save failed — retrying…" : "Synced changes from another device"}
         </div>
       )}
       <Header view={view} setView={setView} activeId={activeId} isAdmin={isAdmin} />

@@ -104,6 +104,14 @@ export default async function handler(req, res) {
 
     const curSessions = cur ? tryParse(cur.value) ?? [] : [];
 
+    // A payload identical to what's stored is a no-op — succeed regardless of
+    // the base version. This absorbs client retries of a save that actually
+    // committed (response lost in transit) without a false conflict, and
+    // avoids burning a snapshot slot on every identical save-back after load.
+    if (cur && cur.value === JSON.stringify(sessions)) {
+      return res.status(200).json({ ok: true, version: cur.updated_at });
+    }
+
     // Optimistic concurrency: clients echo the version they loaded. A stale
     // base means another device saved since — reject instead of clobbering.
     // Clients that send no version (old cached bundles) keep last-write-wins.
