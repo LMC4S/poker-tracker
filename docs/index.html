@@ -105,7 +105,7 @@
       <li><b>Admin</b> (<code>/admin</code>) — PIN-gated. Full read/write over all sessions. This is the only writer.</li>
       <li><b>Observer</b> (<code>/s/&lt;token&gt;</code>) — public, read-only view of one session by unguessable token, plus aggregate series stats.</li>
     </ul>
-    <p>The browser never holds a database credential. Every read and write is brokered by a Vercel serverless function that uses the Supabase <code>service_role</code> key. All session data is stored as a single JSON blob in one Postgres row; the functions are thin CRUD/lookup wrappers over it.</p>
+    <p>The browser never holds a database credential. Every read and write is brokered by a Vercel serverless function that uses the Supabase <code>service_role</code> key. Each session is one Postgres row, and every mutation is a small <b>operation</b> ("add player", "rebuy", "cash out"…) posted individually and recorded in an idempotency ledger — so a retried request applies exactly once, and an entry made on a bad connection can be delayed but never lost.</p>
 
     <h2 id="stack">Stack</h2>
     <table>
@@ -120,14 +120,16 @@
     <h2 id="structure">Project structure</h2>
 <pre><code>api/
   auth.js              POST  PIN hash -&gt; admin secret
-  sessions.js          GET/POST  admin read/write of full history
+  op.js                POST  apply one operation (the only steady-state write path)
+  sessions.js          GET   admin read of all sessions; POST legacy blob write (transitional)
   session.js           GET   public read of one session by ?token=
 src/
   main.jsx             React root, Vercel analytics inject
   App.jsx              Entry; routes /admin -&gt; PinGate+AppContent, else ShareApp
   ShareApp.jsx         Observer view (/s/&lt;token&gt;), polling, two tabs
-  storage.js           Client data layer (fetch wrappers)
-  utils.js             Keys, sha256, uid, money/duration formatting, log + end-time helpers, exportJSON
+  ops.js               Domain logic: applies ops to sessions. Imported by BOTH the client and api/op.js
+  storage.js           Client data layer (fetch wrappers + persisted op queue)
+  utils.js             Keys, sha256, uid, money/duration formatting, log labels, exportJSON
   styles.js            Shared inline style objects
   components/
     PinGate.jsx        Admin auth gate with lockout
@@ -145,13 +147,14 @@ vercel.json            SPA rewrites + security headers
 vite.config.js         Dev server opens /admin</code></pre>
 
     <h2 id="model">Data model</h2>
-    <p>There is one entity, <code>Session</code>, stored in an array. No relational schema — the whole array is serialized to a single Postgres row.</p>
+    <p>There is one entity, <code>Session</code>. Each one lives in its own <code>poker_sessions</code> row: the <code>id</code> is the primary key and the rest of the object is the row's <code>data</code> jsonb. A few fields (<code>shareToken</code>, <code>ended</code>, <code>updatedAt</code>) are mirrored into real columns for indexed lookup and versioning.</p>
 <pre><code><span class="tok-c">// Session</span>
 {
   id: <span class="tok-s">string</span>,           <span class="tok-c">// uid(): base36 timestamp + random</span>
   name: <span class="tok-s">string</span>,         <span class="tok-c">// e.g. "Session 27" or custom</span>
   date: <span class="tok-s">string</span>,         <span class="tok-c">// ISO 8601, session start</span>
   endDate?: <span class="tok-s">string</span>,     <span class="tok-c">// ISO 8601, last cash-out time (fallback: End Session time)</span>
+  updatedAt: <span class="tok-s">string</span>,    <span class="tok-c">// ISO 8601 of the last applied op — this session's version token</span>
   ended: <span class="tok-k">boolean</span>,
   shareToken: <span class="tok-s">string</span> | <span class="tok-k">null</span>, <span class="tok-c">// crypto.randomUUID(), the public link key; null = revoked</span>
   players: Player[],
@@ -174,15 +177,30 @@ vite.config.js         Dev server opens /admin</code></pre>
   player: <span class="tok-s">string</span>,       <span class="tok-c">// player name</span>
   amount?: <span class="tok-k">number</span>       <span class="tok-c">// for join / buyin / cashout</span>
 }</code></pre>
-    <p><b>Derived values</b> (computed, never stored): a player's net is <code>cashout − sum(buyins)</code>. A session balances when total cashouts equal total buy-ins. <code>endDate</code> is recomputed from the latest <code>cashoutAt</code> on every cash-out, undo, and player removal (so a forgotten "End Session" tap doesn't corrupt the recorded end time); it falls back to the End Session time only if nobody cashed out. <code>shareToken</code> is assigned on session creation and backfilled onto sessions that predate the share feature (field absent) when the admin app loads. <code>null</code> means the admin revoked the link and is preserved as-is; the QR dialog can revoke a link or replace it with a fresh token at any time.</p>
+    <p><b>Derived values</b> (computed, never stored): a player's net is <code>cashout − sum(buyins)</code>. A session balances when total cashouts equal total buy-ins. <code>endDate</code> is recomputed from the latest <code>cashoutAt</code> on every cash-out, undo, and player removal (so a forgotten "End Session" tap doesn't corrupt the recorded end time); it falls back to the End Session time only if nobody cashed out. <code>shareToken</code> is assigned on session creation; <code>null</code> means the admin revoked the link. The QR dialog can revoke a link or replace it with a fresh token at any time.</p>
+
+    <h3>Operations</h3>
+    <p>Every mutation is an op, applied by <a href="../src/ops.js">src/ops.js</a> on both sides — optimistically on the client for instant UI, then authoritatively in <code>api/op.js</code>. Log entries and <code>updatedAt</code> are stamped from the op's own <code>at</code> timestamp, so replaying an op yields the same session bytes on either side.</p>
+<pre><code><span class="tok-c">// Op</span>
+{
+  opId: <span class="tok-s">string</span>,      <span class="tok-c">// crypto.randomUUID() — the idempotency key</span>
+  sessionId: <span class="tok-s">string</span>,
+  type: <span class="tok-s">string</span>,      <span class="tok-c">// createSession | addPlayer | rebuy | cashout | undoCashout |</span>
+                     <span class="tok-c">// removePlayer | endSession | reopenSession | deleteSession |</span>
+                     <span class="tok-c">// revokeShare | regenerateShare</span>
+  payload: {          <span class="tok-c">// type-specific fields, plus:</span>
+    at: <span class="tok-s">string</span>        <span class="tok-c">// ISO 8601, stamped client-side at dispatch</span>
+  }
+}</code></pre>
+    <p>Ops that don't apply — a duplicate player name, an unknown player id, ending an already-ended session — are treated as successful no-ops, which is what makes replays and races harmless.</p>
 
     <h2 id="storage">Storage &amp; keys</h2>
     <h3>Server (Postgres)</h3>
-    <p>One table. The live data is a single row keyed by a constant; every overwrite also leaves a snapshot row (see <a href="#concurrency">Concurrency &amp; recovery</a>):</p>
     <table>
-      <tr><th>Key</th><th>Value</th></tr>
-      <tr><td><code>DATA_KEY = "poker-sessions-v2"</code></td><td>live row in <code>poker_data.value</code> holding <code>JSON.stringify(Session[])</code></td></tr>
-      <tr><td><code>poker-sessions-v2:snap:&lt;version&gt;</code></td><td>snapshot of the previous blob, written before each save; the 20 most recent are kept</td></tr>
+      <tr><th>Table</th><th>Purpose</th></tr>
+      <tr><td><code>poker_sessions</code></td><td>one row per session: <code>data</code> jsonb + mirrored <code>share_token</code>/<code>ended</code>/<code>updated_at</code> columns; <code>deleted_at</code> soft-delete</td></tr>
+      <tr><td><code>poker_ops</code></td><td>idempotency ledger and permanent audit trail — one row per applied operation</td></tr>
+      <tr><td><code>poker_data</code></td><td>legacy v2 blob (<code>poker-sessions-v2</code> row + its <code>:snap:</code> rows), frozen as a pre-migration backup and still written by the transitional blob-POST path</td></tr>
     </table>
     <h3>Client (localStorage)</h3>
     <table>
@@ -190,20 +208,30 @@ vite.config.js         Dev server opens /admin</code></pre>
       <tr><td><code>poker-unlocked</code></td><td><code>SESSION_KEY</code> — "admin" once authenticated</td></tr>
       <tr><td><code>poker-admin-secret</code></td><td>API secret returned by <code>/api/auth</code>, sent as <code>x-admin-secret</code></td></tr>
       <tr><td><code>poker-lockout</code></td><td><code>LOCKOUT_KEY</code> — failed-attempt count + lockout expiry</td></tr>
+      <tr><td><code>poker-op-queue</code></td><td>ops not yet confirmed by the server; survives refresh and tab kill</td></tr>
     </table>
 
     <h2 id="schema">Database schema</h2>
-<pre><code><span class="tok-k">create table</span> poker_data (
-  key        text <span class="tok-k">primary key</span>,  <span class="tok-c">-- main blob + snapshot rows (poker-sessions-v2:snap:*)</span>
-  value      text <span class="tok-k">not null</span>,   <span class="tok-c">-- JSON.stringify(Session[])</span>
-  updated_at text                <span class="tok-c">-- doubles as the optimistic-concurrency version token</span>
+<pre><code><span class="tok-k">create table</span> poker_sessions (
+  id          text <span class="tok-k">primary key</span>,
+  data        jsonb <span class="tok-k">not null</span>,   <span class="tok-c">-- the Session object minus id</span>
+  share_token text,               <span class="tok-c">-- mirrored for indexed public lookup (partial index)</span>
+  ended       boolean <span class="tok-k">not null</span> <span class="tok-k">default</span> <span class="tok-k">false</span>,
+  deleted_at  timestamptz,        <span class="tok-c">-- soft delete: audit survives, deletes can't resurrect</span>
+  updated_at  text <span class="tok-k">not null</span>     <span class="tok-c">-- per-session version token (ISO string, CAS target)</span>
 );
 
-<span class="tok-k">alter table</span> poker_data <span class="tok-k">enable row level security</span>;
+<span class="tok-k">create table</span> poker_ops (
+  op_id      text <span class="tok-k">primary key</span>,  <span class="tok-c">-- client uuid; duplicate insert = retry of an applied op</span>
+  session_id text <span class="tok-k">not null</span>,
+  type       text <span class="tok-k">not null</span>,
+  payload    jsonb,
+  applied_at timestamptz <span class="tok-k">not null</span> <span class="tok-k">default</span> now()
+);
 
-<span class="tok-c">-- No anon policy =&gt; all anonymous access denied. Only the</span>
-<span class="tok-c">-- service_role key (used server-side) can read or write.</span>
-<span class="tok-k">create policy</span> <span class="tok-s">"deny all anon"</span> <span class="tok-k">on</span> poker_data
+<span class="tok-c">-- Both tables (and legacy poker_data) carry the same RLS stance:</span>
+<span class="tok-c">-- deny all anon access; only the server-side service_role key can touch them.</span>
+<span class="tok-k">create policy</span> <span class="tok-s">"deny all anon"</span> <span class="tok-k">on</span> poker_sessions
   <span class="tok-k">for all to</span> anon <span class="tok-k">using</span> (<span class="tok-k">false</span>);</code></pre>
 
     <h2 id="routing">Routing</h2>
@@ -222,7 +250,7 @@ vite.config.js         Dev server opens /admin</code></pre>
     <div class="note warn"><b>Gotcha:</b> nested dynamic function files (e.g. <code>api/session/[token].js</code>) were not reliably registered on this setup — requests fell through to the <code>index.html</code> rewrite and returned HTML. Public reads therefore use a top-level <code>api/session.js</code> with a <code>?token=</code> query param. Prefer top-level function files with query params over nested dynamic routes.</div>
 
     <h2 id="api">API reference</h2>
-    <p>Three functions under <code>api/</code>. All responses are JSON. Admin endpoints require the <code>x-admin-secret</code> header (value obtained from <code>/api/auth</code>); it is compared server-side with <code>crypto.timingSafeEqual</code>.</p>
+    <p>Four functions under <code>api/</code>. All responses are JSON. Admin endpoints require the <code>x-admin-secret</code> header (value obtained from <code>/api/auth</code>); it is compared server-side with <code>crypto.timingSafeEqual</code>.</p>
 
     <div class="endpoint">
       <span class="method post">POST</span><span class="route">/api/auth</span>
@@ -232,16 +260,22 @@ vite.config.js         Dev server opens /admin</code></pre>
     </div>
 
     <div class="endpoint">
+      <span class="method post">POST</span><span class="route">/api/op</span>
+      <p>Applies one operation — the only steady-state write path. <b>Header:</b> <code>x-admin-secret</code>. <b>Body:</b> an <code>Op</code> (see <a href="#model">Data model</a>).</p>
+      <p>The op is first inserted into <code>poker_ops</code>; a duplicate <code>op_id</code> means this exact op already committed on an attempt whose response was lost, so the current state is returned without applying twice. Otherwise the session row is read, the op applied via <code>src/ops.js</code>, and the row written with a compare-and-swap on <code>updated_at</code> (re-read and re-applied up to 3 times under contention). If the apply fails after the ledger insert, the ledger row is removed before the error is returned, so the client's retry is not falsely told "already applied".</p>
+      <p><b>Responses:</b> <code>200 { ok, session, version }</code> the authoritative post-op session · <code>200 { ok, deleted: true }</code> the target session is (now) deleted — drop it client-side · <code>400</code> invalid op · <code>404</code> unknown session · <code>401</code> · <code>503</code> CAS contention exhausted (retry) · <code>500</code></p>
+    </div>
+
+    <div class="endpoint">
       <span class="method get">GET</span><span class="route">/api/sessions</span>
-      <p>Returns the full session array. <b>Header:</b> <code>x-admin-secret</code>. The <code>X-Data-Version</code> response header carries the stored row's <code>updated_at</code>, used as the version token for saves. All <code>/api/sessions</code> responses are <code>Cache-Control: no-store</code> — admin data is never cached.</p>
+      <p>Returns all non-deleted sessions, newest first. <b>Header:</b> <code>x-admin-secret</code>. Each session carries its own <code>updatedAt</code> version; the <code>X-Data-Version</code> response header (the newest row stamp) is kept only for pre-v3 clients. All <code>/api/sessions</code> responses are <code>Cache-Control: no-store</code> — admin data is never cached.</p>
       <p><b>Responses:</b> <code>200 Session[]</code> · <code>401</code> bad/missing secret · <code>500</code></p>
     </div>
 
     <div class="endpoint">
       <span class="method post">POST</span><span class="route">/api/sessions</span>
-      <p>Overwrites the full session array (the client sends the whole array on each save). <b>Headers:</b> <code>x-admin-secret</code>, plus <code>x-base-version</code> — the version the client loaded. If another device saved since (stored version no longer matches), the write is rejected with <code>409</code> carrying the current data, instead of clobbering it. Clients that omit <code>x-base-version</code> (old cached bundles) keep last-write-wins. <b>Body:</b> <code>Session[]</code>, shape-validated; an empty array is refused when it would wipe more than one stored session.</p>
-      <p>Before each overwrite the previous blob is copied to a snapshot row (<code>poker-sessions-v2:snap:&lt;version&gt;</code>, last 20 kept), so any bad write is recoverable from the SQL editor.</p>
-      <p><b>Responses:</b> <code>200 { "ok": true, "version": "&lt;new&gt;" }</code> · <code>409 { sessions, version }</code> stale base version · <code>401</code> · <code>400</code> bad/invalid body or refused wipe · <code>500</code></p>
+      <p><b>Transitional, for pre-v3 bundles still open on a device.</b> Accepts the old whole-array save and translates it into per-row upserts: a posted session is written only when its <code>updatedAt</code> is newer than the stored row's, soft-deleted rows are never resurrected, and rows missing from the payload are never deleted. A stale tab can add or update, but cannot wipe anything. Remove this path once every device has loaded the v3 bundle.</p>
+      <p><b>Responses:</b> <code>200 { "ok": true, "version": "&lt;now&gt;" }</code> · <code>401</code> · <code>400</code> invalid body · <code>500</code></p>
     </div>
 
     <div class="endpoint">
@@ -256,17 +290,17 @@ vite.config.js         Dev server opens /admin</code></pre>
     <ol>
       <li><a href="../components/PinGate.jsx">PinGate</a> computes <code>sha256(pin)</code> in the browser and POSTs it to <code>/api/auth</code>.</li>
       <li><a href="../auth.js">auth.js</a> hashes <code>ADMIN_PIN</code> server-side and compares with <code>timingSafeEqual</code>. On match it returns <code>ADMIN_API_SECRET</code>.</li>
-      <li>The secret is stored as <code>poker-admin-secret</code> and sent as <code>x-admin-secret</code> on every <code>/api/sessions</code> call. <a href="../sessions.js">sessions.js</a> compares it with <code>timingSafeEqual</code>.</li>
+      <li>The secret is stored as <code>poker-admin-secret</code> and sent as <code>x-admin-secret</code> on every <code>/api/op</code> and <code>/api/sessions</code> call, where it is compared with <code>timingSafeEqual</code>.</li>
     </ol>
     <p><b>Lockout:</b> 5 failed attempts (<code>MAX_ATTEMPTS</code>) trigger a 15-minute lockout (<code>LOCKOUT_MS</code>), tracked client-side in <code>poker-lockout</code>.</p>
 
     <h2 id="frontend">Frontend architecture</h2>
     <h3>Admin (<code>AppContent</code> in App.jsx)</h3>
     <ul>
-      <li><b>Load:</b> on mount, fetch sessions; backfill <code>shareToken</code> on sessions that predate the share feature (field absent). A <code>null</code> token means the link was revoked and is left alone.</li>
-      <li><b>Save:</b> writes are debounced 300ms; the whole array is POSTed on any change with the <code>x-base-version</code> token. Failed saves show a banner and retry every 3s; a <code>409</code> conflict adopts the server copy and tells the user to re-check their last entry.</li>
-      <li><b>Sync:</b> 5-second polling keeps multiple admin devices in sync. Polling is skipped while a save is pending or in flight, re-checked <i>after</i> the response arrives (a poll snapshot must not overwrite an edit made while it was downloading), and pauses when the tab is hidden.</li>
-      <li><b>Views:</b> <code>home</code> (HomeView), <code>active</code> (ActiveView), <code>summary</code> (SummaryView). Mutations go through a single <code>updateSession(id, fn)</code> reducer.</li>
+      <li><b>Load:</b> on mount, fetch all sessions, then replay any queued ops left over from a previous visit on top of them, and resume sending the queue.</li>
+      <li><b>Write:</b> every user action dispatches an op: it is applied to local state immediately via <code>src/ops.js</code> (optimistic UI) and appended to the localStorage-persisted queue. A single sender posts ops strictly in order, one in flight, retrying network/server failures with 1s→2s→5s backoff (and immediately on the browser's <code>online</code> event). When an op commits and no later ops for that session are queued, the server's authoritative copy is adopted. Banner: quiet normally, <b>Saving…</b> after the queue has been stuck ~3s, <b>Offline — N entries will sync</b> when the browser is offline or the stall drags on. There is no conflict banner: ops from concurrent admins interleave on the server instead of colliding.</li>
+      <li><b>Sync:</b> 5-second polling keeps multiple admin devices in sync, pausing while the tab is hidden or ops are still being sent. The polled list is reconciled per session: a session with queued ops keeps its local copy; otherwise a changed <code>updatedAt</code> means the server copy wins; local sessions missing from the server were deleted elsewhere and are dropped.</li>
+      <li><b>Views:</b> <code>home</code> (HomeView), <code>active</code> (ActiveView), <code>summary</code> (SummaryView). Mutations go through named actions (<code>actions.addPlayer(...)</code>, <code>actions.rebuy(...)</code>, …) that wrap the op dispatch.</li>
       <li><b>Home layout:</b> the admin homepage lists the entire ended-session history inside a fixed-height scroll area (<code>min(45vh, 380px)</code>), so the page itself stays compact and New Session / Backup remain reachable without scrolling past the history.</li>
       <li><b>Share-link management:</b> the <b>QR Code</b> button in ActiveView and SummaryView opens QRModal, which besides the QR offers <b>Revoke Link</b> (sets <code>shareToken</code> to <code>null</code>) and <b>New Link</b> (fresh <code>crypto.randomUUID()</code>), each behind an inline confirm. The button shows even when the link is revoked — the modal is where a new one is created.</li>
     </ul>
@@ -287,28 +321,30 @@ vite.config.js         Dev server opens /admin</code></pre>
     <p>Fields: <code>sessionsThisYear</code>, <code>typicalBuyin</code> (median buy-in), <code>longestSession</code> (h/m from date→endDate), <code>biggestWin</code>, <code>biggestLoss</code>, <code>thisYear</code>. All derived only from <code>ended</code> sessions.</p>
 
     <h2 id="concurrency">Concurrency &amp; recovery</h2>
-    <p>The whole history is one JSON blob, so every save is a full overwrite — the failure mode to engineer against is a stale client clobbering a newer copy. Three layers handle it:</p>
+    <p>The failure mode this design targets is an entry silently lost on a flaky mobile connection. The guarantees, and where each comes from:</p>
     <ol>
-      <li><b>Optimistic concurrency.</b> The live row's <code>updated_at</code> doubles as an opaque version token: <code>GET /api/sessions</code> returns it in <code>X-Data-Version</code>, the client echoes it on save in <code>x-base-version</code>, and the write is a compare-and-swap on that value. A stale base gets <code>409</code> plus the current data; the client adopts the server copy and shows a "check your last entry" notice. <b>Server wins — there is no merge.</b> The user re-enters at most their last action, which is the right trade at this scale.</li>
-      <li><b>Validation.</b> POST bodies are shape-checked, and an empty array is refused while more than one session is stored — deleting sessions one at a time can never produce that write; only bogus client state can.</li>
-      <li><b>Snapshots.</b> Before each overwrite, the previous blob is copied to a <code>:snap:</code> row (last 20 kept). Any bad write — whatever the cause — is recoverable from the SQL Editor:</li>
+      <li><b>An entry can't be lost.</b> Ops live in a localStorage queue until the server confirms them, surviving refresh, tab kill, and hours offline. The sender retries with backoff forever; worst case the UI says "Offline — N entries will sync".</li>
+      <li><b>A retry can't double-apply.</b> <code>poker_ops</code> is an idempotency ledger keyed by the client-generated <code>opId</code>. A retried op whose first attempt actually committed (response lost in transit) is detected by the duplicate key and answered with current state.</li>
+      <li><b>Concurrent admins don't collide.</b> Each session versions independently (<code>updated_at</code> CAS), so edits to different sessions never interact. Two ops racing on the same session serialize: the loser re-reads and re-applies, which is safe because ops are small and self-contained. Editing the same player's same field last-write-wins — both attempts remain visible in the activity log.</li>
+      <li><b>Deletes stay deleted.</b> Sessions are soft-deleted (<code>deleted_at</code>); a stale device's ops or blob-saves for a deleted session are answered with <code>deleted: true</code> and can't resurrect it.</li>
     </ol>
-<pre><code><span class="tok-c">-- list snapshots, newest first</span>
-<span class="tok-k">select</span> key, length(value) <span class="tok-k">from</span> poker_data
-<span class="tok-k">where</span> key <span class="tok-k">like</span> <span class="tok-s">'poker-sessions-v2:snap:%'</span> <span class="tok-k">order by</span> key <span class="tok-k">desc</span>;
+    <h3>Recovery</h3>
+    <p><code>poker_ops</code> doubles as a permanent audit trail — every mutation ever applied, with payload and timestamp, queryable in the SQL Editor:</p>
+<pre><code><span class="tok-c">-- what happened to this session, in order</span>
+<span class="tok-k">select</span> applied_at, type, payload <span class="tok-k">from</span> poker_ops
+<span class="tok-k">where</span> session_id = <span class="tok-s">'&lt;id&gt;'</span> <span class="tok-k">order by</span> applied_at;
 
-<span class="tok-c">-- restore one; a fresh updated_at makes polling clients pick it up</span>
-<span class="tok-c">-- (the token is only ever compared for equality, so any unique string works)</span>
-<span class="tok-k">update</span> poker_data
-  <span class="tok-k">set</span> value = (<span class="tok-k">select</span> value <span class="tok-k">from</span> poker_data <span class="tok-k">where</span> key = <span class="tok-s">'&lt;snap key from above&gt;'</span>),
-      updated_at = now()::text
-<span class="tok-k">where</span> key = <span class="tok-s">'poker-sessions-v2'</span>;</code></pre>
-    <p>The in-app <b>Backup Data</b> button is an export only — it downloads the current <code>Session[]</code> as JSON. There is no import path; restoring a backup file is the same <code>update</code> with the file's contents as <code>value</code>.</p>
+<span class="tok-c">-- undelete a session; bump updated_at so polling clients pick it up</span>
+<span class="tok-k">update</span> poker_sessions
+  <span class="tok-k">set</span> deleted_at = <span class="tok-k">null</span>, updated_at = now()::text
+<span class="tok-k">where</span> id = <span class="tok-s">'&lt;id&gt;'</span>;</code></pre>
+    <p>The pre-v3 history also survives untouched in <code>poker_data</code> (the <code>poker-sessions-v2</code> blob and its <code>:snap:</code> snapshots), frozen at migration time as a last-resort backup.</p>
+    <p>The in-app <b>Backup Data</b> button is an export only — it downloads the current <code>Session[]</code> as JSON. There is no import path; restoring from a file means updating the affected <code>poker_sessions</code> rows' <code>data</code> in the SQL Editor.</p>
 
     <h2 id="security">Security model</h2>
     <ul>
-      <li><b>No client DB credential.</b> The bundle contains no Supabase key. <code>poker_data</code> RLS denies all anon access; only the server-side <code>service_role</code> key can touch it.</li>
-      <li><b>Single writer.</b> The only write path is <code>POST /api/sessions</code>, gated by <code>x-admin-secret</code>. Observers have no write endpoint at all.</li>
+      <li><b>No client DB credential.</b> The bundle contains no Supabase key. RLS on every table denies all anon access; only the server-side <code>service_role</code> key can touch them.</li>
+      <li><b>Admin-only writes.</b> The write paths — <code>POST /api/op</code> and the transitional <code>POST /api/sessions</code> — are both gated by <code>x-admin-secret</code>. Observers have no write endpoint at all.</li>
       <li><b>No enumeration.</b> <code>GET /api/session</code> returns exactly one session matched by token; there is no list endpoint reachable without the admin secret.</li>
       <li><b>Constant-time comparisons</b> for both the PIN hash and the API secret (<code>timingSafeEqual</code>).</li>
       <li><b>Token capability.</b> A <code>shareToken</code> is a bearer capability: anyone with the link can read that one session. Tokens are <code>crypto.randomUUID()</code> (122 bits), not guessable or enumerable. The admin can revoke or replace a session's token from the QR dialog; old links 404 within the edge cache TTL (5s live, 30s ended).</li>
@@ -324,7 +360,7 @@ vite.config.js         Dev server opens /admin</code></pre>
       <tr><td><code>SUPABASE_URL</code></td><td>all functions</td><td>Supabase project URL</td></tr>
       <tr><td><code>SUPABASE_SERVICE_KEY</code></td><td>all functions</td><td><code>service_role</code> secret. Server-only.</td></tr>
       <tr><td><code>ADMIN_PIN</code></td><td>auth.js</td><td>Admin password (hashed for comparison)</td></tr>
-      <tr><td><code>ADMIN_API_SECRET</code></td><td>auth.js, sessions.js</td><td>Returned on login; sent as <code>x-admin-secret</code>. Generate with <code>openssl rand -hex 32</code>.</td></tr>
+      <tr><td><code>ADMIN_API_SECRET</code></td><td>auth.js, op.js, sessions.js</td><td>Returned on login; sent as <code>x-admin-secret</code>. Generate with <code>openssl rand -hex 32</code>.</td></tr>
     </table>
     <div class="note">No <code>VITE_*</code> variables are needed — nothing in the browser talks to Supabase directly.</div>
 
@@ -338,8 +374,9 @@ npm run build   <span class="tok-c"># vite build -&gt; dist/</span></code></pre>
       <tr><th>File</th><th>Purpose</th></tr>
       <tr><td><code>20260101000000_init.sql</code></td><td>Creates <code>poker_data</code> + the deny-all-anon RLS policy.</td></tr>
       <tr><td><code>20260606000000_per_session_share.sql</code></td><td>Drops the legacy <code>poker_public</code> snapshot table (now unused). No-op on fresh installs.</td></tr>
+      <tr><td><code>20260703000000_op_based_backend.sql</code></td><td>v3: creates <code>poker_sessions</code> + <code>poker_ops</code> (with RLS) and backfills one row per session from the v2 blob, which is left untouched as backup. Idempotent; ends with a count check that must show matching numbers.</td></tr>
     </table>
-    <p>Run migrations in the Supabase SQL Editor in filename order. The legacy <code>poker_public</code> table previously held a derived public snapshot read by an anon key; the per-session-share model replaced it with the service-key <code>/api/session</code> endpoint, so it is removed.</p>
+    <p>Run migrations in the Supabase SQL Editor in filename order — the v3 migration must run <b>before</b> the v3 code deploys, since the API reads <code>poker_sessions</code>. The legacy <code>poker_public</code> table previously held a derived public snapshot read by an anon key; the per-session-share model replaced it with the service-key <code>/api/session</code> endpoint, so it is removed.</p>
 
     <footer>
       Home Game Tracker · MIT · <a href="https://github.com/LMC4S/poker-tracker">LMC4S/poker-tracker</a> · React · Vercel · Supabase

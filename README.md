@@ -27,7 +27,8 @@ Each session has its own link of the form `https://<app>.vercel.app/s/<token>`. 
 - Timestamped activity log for every buy-in, rebuy, and cash-out
 - Session end time recorded automatically from the last cash-out
 - Series stats across all games — sessions played, typical buy-in, longest session, biggest swing
-- Conflict-safe saves — concurrent admin devices can't overwrite each other, failed saves retry with a visible warning, and the server keeps snapshots of the last 20 saves
+- Entries can't be lost to bad wifi — every action is a tiny operation queued on the device, retried until the server confirms it, and applied exactly once; an entry made with no signal survives a page refresh and syncs when signal returns
+- Conflict-free multi-admin editing — each session versions independently, so two devices editing different sessions never collide, and the server keeps a permanent audit trail of every operation
 - One-click JSON backup of all data
 - Mobile-first layout
 - Runs on the Vercel and Supabase free tiers
@@ -38,7 +39,7 @@ Requires free accounts on [Vercel](https://vercel.com) and [Supabase](https://su
 
 ### Step 1 — Database
 
-Create a Supabase project. In the **SQL Editor**, run [`supabase/migrations/20260101000000_init.sql`](supabase/migrations/20260101000000_init.sql), which creates the `poker_data` table and the row-level-security policy that denies all anonymous access.
+Create a Supabase project. In the **SQL Editor**, run each file in [`supabase/migrations/`](supabase/migrations/) in filename order. They create the tables (one row per session plus an operation ledger) and the row-level-security policies that deny all anonymous access.
 
 From **Project Settings → API**, note two values:
 - **Project URL** — e.g. `https://abcdefg.supabase.co`
