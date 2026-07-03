@@ -10,6 +10,15 @@ Self-hosted web app for tracking buy-ins, cashouts, and balances during a home p
 
 📖 **[Developer documentation](https://lmc4s.github.io/poker-tracker/docs/)** — architecture, data model, HTTP API reference, auth flow, and security model. ([source](docs/index.html))
 
+<p align="center">
+  <img src="docs/screenshots/admin-home.png" width="260" alt="Admin home — series stats, the active game, and session history">
+  <img src="docs/screenshots/admin-session.png" width="260" alt="A running session in the admin panel — buy-ins, cash-outs, and the activity log">
+  <img src="docs/screenshots/share-view.png" width="260" alt="The read-only view players open by scanning the session QR code">
+</p>
+<p align="center">
+  <sub>Admin home · a running session (admin) · the read-only view players see</sub>
+</p>
+
 ## How sharing works
 
 Each session has its own link of the form `https://<app>.vercel.app/s/<token>`. The host taps **QR Code** on an active session and players scan it with their phone to view an active session. 
