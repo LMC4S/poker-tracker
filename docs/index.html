@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Home Game Tracker — Developer Documentation</title>
+<title>Poker Session Tracker — Developer Documentation</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Oswald:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -92,7 +92,7 @@
   </aside>
 
   <main>
-    <h1>Home Game Tracker</h1>
+    <h1>Poker Session Tracker</h1>
     <div class="subtitle">Self-hosted poker home-game tracker. React SPA + Vercel serverless functions + Supabase Postgres.</div>
     <div class="badges">
       <code>MIT</code> &nbsp; <code>React 18</code> &nbsp; <code>Vite 5</code> &nbsp; <code>Node serverless</code> &nbsp; <code>Postgres</code>
@@ -379,7 +379,7 @@ npm run build   <span class="tok-c"># vite build -&gt; dist/</span></code></pre>
     <p>Run migrations in the Supabase SQL Editor in filename order — the v3 migration must run <b>before</b> the v3 code deploys, since the API reads <code>poker_sessions</code>. The legacy <code>poker_public</code> table previously held a derived public snapshot read by an anon key; the per-session-share model replaced it with the service-key <code>/api/session</code> endpoint, so it is removed.</p>
 
     <footer>
-      Home Game Tracker · MIT · <a href="https://github.com/LMC4S/poker-tracker">LMC4S/poker-tracker</a> · React · Vercel · Supabase
+      Poker Session Tracker · MIT · <a href="https://github.com/LMC4S/poker-tracker">LMC4S/poker-tracker</a> · React · Vercel · Supabase
     </footer>
   </main>
 </div>

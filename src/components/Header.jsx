@@ -8,7 +8,7 @@ export default function Header({ view, setView, activeId, isAdmin, showNav = tru
   return (
     <div style={S.header}>
       <div style={S.headerLeft}>
-        <span style={S.title}>Home Game Tracker</span>
+        <span style={S.title}>Poker Session Tracker</span>
       </div>
       {showNav && (
         <div style={S.nav}>

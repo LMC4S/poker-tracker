@@ -86,7 +86,7 @@ export default function PinGate({ children }) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#fbf0df" }}>
       <div style={{ background: "#f0e0c4", border: "1px solid #d4b898", borderRadius: 16, padding: "48px 36px", width: "100%", maxWidth: 340, textAlign: "center" }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#7a5030", letterSpacing: "4px", textTransform: "uppercase", marginBottom: 6, fontFamily: FB }}>Home Game</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#7a5030", letterSpacing: "4px", textTransform: "uppercase", marginBottom: 6, fontFamily: FB }}>Poker Session</div>
         <div style={{ fontSize: 34, fontWeight: 900, color: "#2a0a08", letterSpacing: "4px", textTransform: "uppercase", marginBottom: 32, fontFamily: FB }}>Tracker</div>
         <input
           autoFocus

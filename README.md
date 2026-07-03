@@ -1,4 +1,4 @@
-# Home Game Tracker
+# Poker Session Tracker
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>

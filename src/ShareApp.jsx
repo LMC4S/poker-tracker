@@ -17,7 +17,7 @@ function Door({ message }) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#fbf0df" }}>
       <div style={{ textAlign: "center", padding: 24 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#7a5030", letterSpacing: "4px", textTransform: "uppercase", fontFamily: FB }}>Home Game</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#7a5030", letterSpacing: "4px", textTransform: "uppercase", fontFamily: FB }}>Poker Session</div>
         <div style={{ fontSize: 34, fontWeight: 900, color: "#2a0a08", letterSpacing: "4px", textTransform: "uppercase", marginTop: 6, fontFamily: FB }}>Tracker</div>
         <div style={{ marginTop: 32, color: "#7a5030", fontSize: 13, letterSpacing: "1px", maxWidth: 320, lineHeight: 1.6 }}>{message}</div>
       </div>
