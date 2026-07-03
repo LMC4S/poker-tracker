@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { fmtMoney, fmt, profitColor, logEvent, logLabel, fmtDuration, recomputeEndDate } from "../utils";
+import { fmtMoney, fmt, profitColor, logLabel, fmtDuration } from "../utils";
 import { S, F } from "../styles";
 import { PlusIcon, TrashIcon } from "../components/icons";
 import QRModal from "../components/QRModal";
 
-export default function ActiveView({ session, isAdmin, updateSession, setModal, onEnd, onRevoke, onRegenerate }) {
+export default function ActiveView({ session, isAdmin, actions, setModal, onEnd, onRevoke, onRegenerate }) {
   const [confirmingId, setConfirmingId] = useState(null);
   const [showQR, setShowQR] = useState(false);
   const [showLog, setShowLog] = useState(false);
@@ -20,22 +20,8 @@ export default function ActiveView({ session, isAdmin, updateSession, setModal, 
   const allCashedOut = session.players.length > 0 && cashedOutCount === session.players.length;
   const balance = allCashedOut ? totalCashouts - totalBuyins : null;
 
-  const removePlayer = (pid) => {
-    updateSession(session.id, s => {
-      const p = s.players.find(x => x.id === pid);
-      const next = { ...s, players: s.players.filter(x => x.id !== pid) };
-      if (p) logEvent(next, "remove", p.name);
-      return recomputeEndDate(next);
-    });
-  };
-
-  const undoCashout = (pid) => {
-    updateSession(session.id, s => {
-      const p = s.players.find(x => x.id === pid);
-      if (p) { p.cashout = null; p.cashoutAt = null; logEvent(s, "undo", p.name); return recomputeEndDate(s); }
-      return s;
-    });
-  };
+  const removePlayer = (pid) => actions.removePlayer(session.id, pid);
+  const undoCashout = (pid) => actions.undoCashout(session.id, pid);
 
   return (
     <div style={S.content}>

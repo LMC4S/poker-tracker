@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { loadSessions, saveSessions } from "./storage";
-import { uid, mergeSessions } from "./utils";
+import { useState, useEffect, useRef } from "react";
+import { loadSessions, sendOp, loadQueue, saveQueue } from "./storage";
+import { applyOpToList } from "./ops";
+import { uid } from "./utils";
 import { S } from "./styles";
 import PinGate from "./components/PinGate";
 import Header from "./components/Header";
@@ -15,156 +16,188 @@ function AppContent({ isAdmin }) {
   const [view, setView] = useState("home");
   const [activeId, setActiveId] = useState(null);
   const [loaded, setLoaded] = useState(false);
-  const [saveEnabled, setSaveEnabled] = useState(false);
   const [modal, setModal] = useState(null);
   const [summaryId, setSummaryId] = useState(null);
-  // idle | error (save failing, retrying) | conflict (another device saved first)
-  const [syncState, setSyncState] = useState("idle");
+  // hidden | saving | offline — reflects the state of the op queue
+  const [syncState, setSyncState] = useState("hidden");
+  const [pendingCount, setPendingCount] = useState(0);
 
-  const pendingSaveRef = useRef(null);
-  const savingRef = useRef(false);
-  // Version token of the data we last loaded/saved; echoed on save so the
-  // server can reject writes based on stale data
-  const versionRef = useRef(null);
-  // Set when sessions state was just replaced with server data, so the save
-  // effect doesn't pointlessly upload it right back
-  const skipSaveRef = useRef(false);
-  // Ids deleted in this tab, so a conflict merge doesn't resurrect them
-  const deletedIdsRef = useRef(new Set());
-  // Mirror of the latest rendered sessions, readable from async callbacks
-  const sessionsRef = useRef(sessions);
-  sessionsRef.current = sessions;
+  // Every mutation is an op: applied locally at once, queued in localStorage,
+  // and sent to /api/op strictly in order with one in flight. The queue
+  // survives refresh and tab kill, and the server's op ledger makes retries
+  // idempotent — so an entry made on bad wifi can be delayed but never lost.
+  const queueRef = useRef(loadQueue());
+  const sendingRef = useRef(false);
+  const retryRef = useRef(null);
+  const backoffRef = useRef(1000);
+  // When the queue first became non-empty; drives the Saving…/Offline banner
+  const stuckSinceRef = useRef(null);
 
-  // Load sessions once after login (hash is in sessionStorage)
-  useEffect(() => {
-    loadSessions().then(r => {
-      if (r !== null) {
-        versionRef.current = r.version;
-        // Backfill share tokens for pre-share-feature sessions (no field at all);
-        // null means the admin revoked the link, so leave it off
-        setSessions(r.sessions.map(sess => sess.shareToken !== undefined ? sess : { ...sess, shareToken: crypto.randomUUID() }));
-        setSaveEnabled(true);
+  const setQueue = (queue) => {
+    queueRef.current = queue;
+    saveQueue(queue);
+    setPendingCount(queue.length);
+  };
+
+  const pump = async () => {
+    if (sendingRef.current) return;
+    const op = queueRef.current[0];
+    if (!op) return;
+    sendingRef.current = true;
+    const result = await sendOp(op);
+    sendingRef.current = false;
+    if (result.retry) {
+      clearTimeout(retryRef.current);
+      retryRef.current = setTimeout(pump, backoffRef.current);
+      backoffRef.current = Math.min(backoffRef.current * 2, 5000);
+      return;
+    }
+    // Committed (ok) or permanently rejected (drop) — either way it's done
+    setQueue(queueRef.current.slice(1));
+    backoffRef.current = 1000;
+    if (result.ok) {
+      if (result.deleted) {
+        setSessions(prev => prev.filter(s => s.id !== op.sessionId));
+      } else if (result.session && !queueRef.current.some(q => q.sessionId === op.sessionId)) {
+        // Adopt the server's authoritative copy once none of our queued ops
+        // are still ahead of it (reconciles server-side dedupe etc.)
+        setSessions(prev => prev.map(s => s.id === result.session.id ? result.session : s));
       }
+    }
+    if (queueRef.current.length) pump();
+  };
+
+  const dispatch = (type, sessionId, payload = {}) => {
+    const op = { opId: crypto.randomUUID(), sessionId, type, payload: { ...payload, at: new Date().toISOString() } };
+    setSessions(prev => applyOpToList(prev, op));
+    setQueue([...queueRef.current, op]);
+    pump();
+  };
+
+  // Merge a freshly polled server list into local state. A session with
+  // queued ops keeps its local copy (the server hasn't seen those ops yet);
+  // otherwise the side with a different updatedAt — the server's — wins.
+  // Local sessions the server no longer has were deleted elsewhere.
+  const reconcile = (local, server) => {
+    const pending = new Set(queueRef.current.map(o => o.sessionId));
+    const byId = new Map(server.map(s => [s.id, s]));
+    const out = [];
+    for (const s of local) {
+      if (pending.has(s.id)) {
+        out.push(s);
+        byId.delete(s.id);
+      } else if (byId.has(s.id)) {
+        const remote = byId.get(s.id);
+        out.push(remote.updatedAt !== s.updatedAt ? remote : s);
+        byId.delete(s.id);
+      }
+    }
+    for (const r of byId.values()) out.push(r);
+    out.sort((a, b) => new Date(b.date) - new Date(a.date));
+    // Preserve the old array identity when nothing changed so React skips
+    // re-rendering and effects don't churn
+    return out.length === local.length && out.every((s, i) => s === local[i]) ? local : out;
+  };
+
+  // Load once after login, then resume whatever queue a previous visit left
+  // behind. Replaying the queue over the fetched list shows offline-made
+  // entries immediately; if one of them actually committed before the reload
+  // it can render twice for the moment it takes the ledger to dedupe it.
+  useEffect(() => {
+    loadSessions().then(list => {
+      if (list !== null) {
+        setSessions(queueRef.current.reduce((s, op) => applyOpToList(s, op), list));
+      }
+      setPendingCount(queueRef.current.length);
       setLoaded(true);
+      pump();
     });
+    return () => clearTimeout(retryRef.current);
   }, []);
 
-  // Save on change. Failed saves retry every 3s with a visible banner instead
-  // of silently dropping data; version conflicts adopt the server copy.
+  // Poll every 5s to sync across admin devices — pause when tab is hidden,
+  // and stand down entirely while our own ops are still being sent
   useEffect(() => {
-    if (!saveEnabled) return;
-    if (skipSaveRef.current) { skipSaveRef.current = false; return; }
-    clearTimeout(pendingSaveRef.current);
-    const attempt = async () => {
-      if (savingRef.current) { pendingSaveRef.current = setTimeout(attempt, 150); return; }
-      savingRef.current = true;
-      const result = await saveSessions(sessions, versionRef.current);
-      savingRef.current = false;
-      if (result.ok) {
-        if (result.version) versionRef.current = result.version;
-        pendingSaveRef.current = null;
-        // Clear a failure banner, but let a conflict notice run its full course
-        setSyncState(s => s === "error" ? "idle" : s);
-      } else if (result.conflict) {
-        // Another writer (usually this user's other device or a stale tab)
-        // saved first. Merge their copy with ours and let the save effect
-        // retry against the fresh version, instead of discarding the entry
-        // the user just made.
-        versionRef.current = result.version;
-        pendingSaveRef.current = null;
-        const local = sessionsRef.current;
-        const merged = mergeSessions(local, result.sessions, deletedIdsRef.current);
-        // Only announce it when the merge actually pulled in remote changes
-        if (JSON.stringify(merged) !== JSON.stringify(local)) setSyncState("conflict");
-        // Always a fresh array so the save effect re-runs and retries
-        setSessions(prev => mergeSessions(prev, result.sessions, deletedIdsRef.current));
-      } else {
-        setSyncState("error");
-        pendingSaveRef.current = setTimeout(attempt, 3000);
-      }
-    };
-    pendingSaveRef.current = setTimeout(attempt, 300);
-  }, [sessions, saveEnabled]);
-
-  // Auto-dismiss the conflict notice
-  useEffect(() => {
-    if (syncState !== "conflict") return;
-    const t = setTimeout(() => setSyncState(s => s === "conflict" ? "idle" : s), 6000);
-    return () => clearTimeout(t);
-  }, [syncState]);
-
-  // Poll every 5s to sync across admin devices — pause when tab is hidden
-  // Skip poll if a save is pending or in-flight to avoid overwriting local changes
-  useEffect(() => {
-    if (!saveEnabled) return;
+    if (!loaded) return;
     let interval = null;
     const poll = async () => {
-      if (pendingSaveRef.current || savingRef.current) return;
+      if (sendingRef.current || queueRef.current.length) return;
       const fresh = await loadSessions();
       if (fresh === null) return;
-      // Re-check after the download: a local change made while the response
-      // was in flight must not be overwritten by this (now stale) snapshot
-      if (pendingSaveRef.current || savingRef.current) return;
-      if (fresh.version !== null && fresh.version === versionRef.current) return;
-      setSessions(prev => {
-        if (JSON.stringify(prev) === JSON.stringify(fresh.sessions)) {
-          versionRef.current = fresh.version;
-          return prev;
-        }
-        skipSaveRef.current = true;
-        versionRef.current = fresh.version;
-        return fresh.sessions;
-      });
+      setSessions(prev => reconcile(prev, fresh));
     };
     const start = () => { if (!interval) interval = setInterval(poll, 5000); };
     const stop = () => { clearInterval(interval); interval = null; };
-    // Poll immediately on wake — a tab resumed after hours holds a stale
-    // version token, and waiting a full interval leaves a window where the
-    // user's first edit saves against it and conflicts
+    // Poll immediately on wake so a tab resumed after hours catches up before
+    // the user reads stale numbers
     const onVisibility = () => { if (document.hidden) stop(); else { poll(); start(); } };
     start();
     document.addEventListener("visibilitychange", onVisibility);
     return () => { stop(); document.removeEventListener("visibilitychange", onVisibility); };
-  }, [saveEnabled]);
+  }, [loaded]);
+
+  // Banner: quiet while ops commit promptly, "Saving…" when the queue has
+  // been stuck a few seconds, "Offline" when the browser says so or the
+  // stall drags on
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (queueRef.current.length === 0) {
+        stuckSinceRef.current = null;
+        setSyncState("hidden");
+        return;
+      }
+      if (!stuckSinceRef.current) stuckSinceRef.current = Date.now();
+      const stuck = Date.now() - stuckSinceRef.current;
+      setSyncState(navigator.onLine === false || stuck > 12000 ? "offline" : stuck > 3000 ? "saving" : "hidden");
+    }, 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Retry as soon as connectivity returns instead of waiting out a backoff
+  useEffect(() => {
+    const onOnline = () => { clearTimeout(retryRef.current); backoffRef.current = 1000; pump(); };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, []);
 
   const activeSession = sessions.find(s => s.id === activeId);
   const summarySession = sessions.find(s => s.id === summaryId);
 
-  const updateSession = useCallback((id, fn) => {
-    // Stamp every mutation so a conflict merge can tell which side is newer
-    setSessions(prev => prev.map(s => s.id === id ? { ...fn({ ...s, players: s.players.map(p => ({ ...p, buyins: [...p.buyins] })) }), updatedAt: new Date().toISOString() } : s));
-  }, []);
-
-  const startNewSession = (name) => {
-    const s = { id: uid(), name: name || `Session ${sessions.length + 1}`, date: new Date().toISOString(), updatedAt: new Date().toISOString(), players: [], log: [], ended: false, shareToken: crypto.randomUUID() };
-    setSessions(prev => [s, ...prev]);
-    setActiveId(s.id);
-    setView("active");
-  };
-
-  const endSession = (id) => {
-    // endDate is auto-derived from the last cash-out; only fall back to now if nobody cashed out
-    updateSession(id, s => ({ ...s, ended: true, endDate: s.endDate || new Date().toISOString() }));
-    setSummaryId(id);
-    setView("summary");
-  };
-
-  const deleteSession = (id) => {
-    deletedIdsRef.current.add(id);
-    setSessions(prev => prev.filter(s => s.id !== id));
-    if (activeId === id) { setActiveId(null); setView("home"); }
-    if (summaryId === id) { setSummaryId(null); setView("home"); }
-  };
-
-  // Revoked links 404 on /api/session (null never matches a token); replacing
-  // generates a fresh token so old links and saved QR codes die immediately
-  const revokeShare = (id) => updateSession(id, s => ({ ...s, shareToken: null }));
-  const regenerateShare = (id) => updateSession(id, s => ({ ...s, shareToken: crypto.randomUUID() }));
-
-  const resumeSession = (id) => {
-    updateSession(id, s => ({ ...s, ended: false }));
-    setActiveId(id);
-    setView("active");
+  const actions = {
+    createSession: (name) => {
+      const id = uid();
+      dispatch("createSession", id, {
+        name: name || `Session ${sessions.length + 1}`,
+        date: new Date().toISOString(),
+        shareToken: crypto.randomUUID(),
+      });
+      setActiveId(id);
+      setView("active");
+    },
+    addPlayer: (name, buyin) => dispatch("addPlayer", activeId, { playerId: uid(), name, buyin }),
+    rebuy: (playerId, amount) => dispatch("rebuy", activeId, { playerId, amount }),
+    cashout: (playerId, amount) => dispatch("cashout", activeId, { playerId, amount }),
+    undoCashout: (sessionId, playerId) => dispatch("undoCashout", sessionId, { playerId }),
+    removePlayer: (sessionId, playerId) => dispatch("removePlayer", sessionId, { playerId }),
+    endSession: (id) => {
+      dispatch("endSession", id);
+      setSummaryId(id);
+      setView("summary");
+    },
+    resumeSession: (id) => {
+      dispatch("reopenSession", id);
+      setActiveId(id);
+      setView("active");
+    },
+    deleteSession: (id) => {
+      dispatch("deleteSession", id);
+      if (activeId === id) { setActiveId(null); setView("home"); }
+      if (summaryId === id) { setSummaryId(null); setView("home"); }
+    },
+    // Revoked links 404 on /api/session (null never matches a token); replacing
+    // generates a fresh token so old links and saved QR codes die immediately
+    revokeShare: (id) => dispatch("revokeShare", id),
+    regenerateShare: (id) => dispatch("regenerateShare", id, { shareToken: crypto.randomUUID() }),
   };
 
   const openSession = (id) => {
@@ -177,22 +210,24 @@ function AppContent({ isAdmin }) {
 
   return (
     <div style={S.app}>
-      {syncState !== "idle" && (
+      {syncState !== "hidden" && (
         <div style={{
           position: "fixed", top: 10, left: "50%", transform: "translateX(-50%)", zIndex: 300,
-          background: syncState === "error" ? "#450206" : "#7a5030", color: "#fbf0df",
+          background: syncState === "offline" ? "#450206" : "#7a5030", color: "#fbf0df",
           padding: "8px 18px", borderRadius: 20, fontSize: 11, fontWeight: 600,
           letterSpacing: "1px", textTransform: "uppercase", whiteSpace: "nowrap",
           boxShadow: "0 4px 16px rgba(42,10,8,0.35)"
         }}>
-          {syncState === "error" ? "Save failed — retrying…" : "Synced changes from another device"}
+          {syncState === "offline"
+            ? `Offline — ${pendingCount} ${pendingCount === 1 ? "entry" : "entries"} will sync`
+            : "Saving…"}
         </div>
       )}
       <Header view={view} setView={setView} activeId={activeId} isAdmin={isAdmin} />
       {view === "home"    && <HomeView sessions={sessions} isAdmin={isAdmin} onNew={() => setModal({ type: "newSession" })} onOpen={openSession} />}
-      {view === "active"  && activeSession  && <ActiveView session={activeSession} isAdmin={isAdmin} updateSession={updateSession} setModal={setModal} onEnd={() => endSession(activeId)} onRevoke={revokeShare} onRegenerate={regenerateShare} />}
-      {view === "summary" && summarySession && <SummaryView session={summarySession} isAdmin={isAdmin} onResume={() => resumeSession(summaryId)} onBack={() => setView("home")} onDelete={deleteSession} onRevoke={revokeShare} onRegenerate={regenerateShare} />}
-      {isAdmin && modal && <Modal modal={modal} setModal={setModal} sessions={sessions} activeSession={activeSession} updateSession={updateSession} startNewSession={startNewSession} activeId={activeId} />}
+      {view === "active"  && activeSession  && <ActiveView session={activeSession} isAdmin={isAdmin} actions={actions} setModal={setModal} onEnd={() => actions.endSession(activeId)} onRevoke={actions.revokeShare} onRegenerate={actions.regenerateShare} />}
+      {view === "summary" && summarySession && <SummaryView session={summarySession} isAdmin={isAdmin} onResume={() => actions.resumeSession(summaryId)} onBack={() => setView("home")} onDelete={actions.deleteSession} onRevoke={actions.revokeShare} onRegenerate={actions.regenerateShare} />}
+      {isAdmin && modal && <Modal modal={modal} setModal={setModal} sessions={sessions} activeSession={activeSession} actions={actions} />}
     </div>
   );
 }

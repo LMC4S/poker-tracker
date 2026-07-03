@@ -84,7 +84,7 @@ export default function ShareApp() {
         session.ended ? (
           <SummaryView session={session} isAdmin={false} onResume={() => {}} onBack={() => setView("home")} onDelete={() => {}} />
         ) : (
-          <ActiveView session={session} isAdmin={false} updateSession={() => {}} setModal={() => {}} onEnd={() => {}} />
+          <ActiveView session={session} isAdmin={false} actions={null} setModal={() => {}} onEnd={() => {}} />
         )
       )}
     </div>

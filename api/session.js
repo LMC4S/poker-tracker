@@ -1,7 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
 
-const DATA_KEY = "poker-sessions-v2";
-
 function getSupabase() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_KEY;
@@ -71,21 +69,17 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: e.message });
   }
 
+  // The stats need every session anyway (the table is tiny), so one query
+  // serves both the token lookup and the aggregates
   const { data, error } = await supabase
-    .from("poker_data")
-    .select("value")
-    .eq("key", DATA_KEY)
-    .single();
-  if (error && error.code !== "PGRST116") {
+    .from("poker_sessions")
+    .select("id, data")
+    .is("deleted_at", null);
+  if (error) {
     return res.status(500).json({ error: error.message });
   }
 
-  let sessions = [];
-  if (data) {
-    try { sessions = JSON.parse(data.value); } catch {
-      return res.status(500).json({ error: "Stored data is corrupted" });
-    }
-  }
+  const sessions = (data || []).map(row => ({ id: row.id, ...row.data }));
   const session = sessions.find(s => s.shareToken === token);
   if (!session) {
     // Cache misses briefly so a bot spraying bad tokens can't make every

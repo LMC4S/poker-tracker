@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { uid, logEvent, recomputeEndDate } from "../utils";
 import { S } from "../styles";
 
-export default function Modal({ modal, setModal, sessions, activeSession, updateSession, startNewSession, activeId }) {
+export default function Modal({ modal, setModal, sessions, activeSession, actions }) {
   const close = () => setModal(null);
   const [val, setVal] = useState("");
   const [val2, setVal2] = useState(modal.type === "cashout" ? "" : "20");
@@ -15,7 +14,7 @@ export default function Modal({ modal, setModal, sessions, activeSession, update
 
   const players = activeSession?.players || [];
 
-  const handleNewSession = () => { startNewSession(val.trim() || undefined); close(); };
+  const handleNewSession = () => { actions.createSession(val.trim() || undefined); close(); };
 
   const handleAddPlayer = () => {
     const raw = val.trim();
@@ -23,11 +22,7 @@ export default function Modal({ modal, setModal, sessions, activeSession, update
     const amount = parseFloat(val2);
     if (!name) return;
     if (players.find(p => p.name.toLowerCase() === name.toLowerCase())) return;
-    updateSession(activeId, s => {
-      if (s.players.find(p => p.name.toLowerCase() === name.toLowerCase())) return s;
-      s.players.push({ id: uid(), name, buyins: amount > 0 ? [amount] : [], cashout: null });
-      return logEvent(s, "join", name, amount > 0 ? amount : null);
-    });
+    actions.addPlayer(name, amount > 0 ? amount : null);
     setVal(""); setVal2("20");
     setLastAdded(name);
     setConfirmVisible(true);
@@ -38,22 +33,14 @@ export default function Modal({ modal, setModal, sessions, activeSession, update
   const handleBuyin = () => {
     const amount = parseFloat(val2);
     if (!selectedPlayer || !amount || amount <= 0) return;
-    updateSession(activeId, s => {
-      const p = s.players.find(x => x.id === selectedPlayer);
-      if (p) { p.buyins.push(amount); return logEvent(s, "buyin", p.name, amount); }
-      return s;
-    });
+    actions.rebuy(selectedPlayer, amount);
     setVal2(""); close();
   };
 
   const handleCashout = () => {
     const amount = parseFloat(val2);
     if (isNaN(amount) || amount < 0) return;
-    updateSession(activeId, s => {
-      const p = s.players.find(x => x.id === modal.playerId);
-      if (p) { p.cashout = amount; p.cashoutAt = new Date().toISOString(); logEvent(s, "cashout", p.name, amount); return recomputeEndDate(s); }
-      return s;
-    });
+    actions.cashout(modal.playerId, amount);
     setVal2(""); close();
   };
 

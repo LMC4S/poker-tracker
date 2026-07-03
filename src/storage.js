@@ -2,43 +2,67 @@ function getAdminSecret() {
   return localStorage.getItem("poker-admin-secret");
 }
 
-// Returns { sessions, version } or null on any failure. The version is an
-// opaque token echoed back on save so the server can detect stale writes.
+const QUEUE_KEY = "poker-op-queue";
+
+// The op queue is persisted so an entry made with no signal survives a page
+// refresh or tab kill and still syncs later.
+export function loadQueue() {
+  try {
+    const q = JSON.parse(localStorage.getItem(QUEUE_KEY));
+    return Array.isArray(q) ? q : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveQueue(queue) {
+  try {
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+  } catch (e) {
+    console.error("Queue persist failed:", e);
+  }
+}
+
+// Returns the session array or null on any failure.
 export async function loadSessions() {
   try {
     const res = await fetch("/api/sessions", {
       headers: { "x-admin-secret": getAdminSecret() }
     });
     if (!res.ok) throw new Error(`Load failed: ${res.status}`);
-    const sessions = await res.json();
-    return { sessions, version: res.headers.get("x-data-version") || null };
+    return await res.json();
   } catch (e) {
     console.error("Load failed:", e);
     return null;
   }
 }
 
-// Returns { ok, version } on success, { conflict, sessions, version } when
-// another device saved first, or { ok: false } on network/server failure.
-export async function saveSessions(sessions, baseVersion) {
+// Posts one op. Returns:
+//   { ok, session?, deleted? } — committed; session is the server's
+//                                authoritative copy (absent when deleted)
+//   { drop: true }            — permanently rejected, discard the op
+//   { retry: true }           — network/server trouble, try again
+export async function sendOp(op) {
   try {
-    const headers = { "Content-Type": "application/json", "x-admin-secret": getAdminSecret() };
-    if (baseVersion) headers["x-base-version"] = baseVersion;
-    const res = await fetch("/api/sessions", {
+    const res = await fetch("/api/op", {
       method: "POST",
-      headers,
-      body: JSON.stringify(sessions)
+      headers: { "Content-Type": "application/json", "x-admin-secret": getAdminSecret() },
+      body: JSON.stringify(op)
     });
-    if (res.status === 409) {
-      const body = await res.json();
-      return { conflict: true, sessions: body.sessions || [], version: body.version || null };
+    if (res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { ok: true, session: body.session || null, deleted: !!body.deleted };
     }
-    if (!res.ok) throw new Error(`Save failed: ${res.status}`);
-    const body = await res.json().catch(() => ({}));
-    return { ok: true, version: body.version || null };
+    // Invalid op or missing session can never succeed; everything else
+    // (5xx, 401 misconfig, timeouts) is worth retrying
+    if (res.status === 400 || res.status === 404) {
+      console.error("Op rejected:", res.status, op);
+      return { drop: true };
+    }
+    return { retry: true };
   } catch (e) {
-    console.error("Save failed:", e);
-    return { ok: false };
+    console.error("Op send failed:", e);
+    return { retry: true };
   }
 }
 

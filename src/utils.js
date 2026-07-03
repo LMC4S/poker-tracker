@@ -33,20 +33,6 @@ export const fmtDuration = (ms) => {
 const TIME_OPTS = { hour: "numeric", minute: "2-digit" };
 export const fmtTime = (iso) => new Date(iso).toLocaleTimeString(undefined, TIME_OPTS);
 
-// Derives a session's endDate from the latest cash-out still in effect (mutates & returns).
-// Players forget to hit "End Session", so the real end time is when the last player cashed out.
-export const recomputeEndDate = (s) => {
-  const times = s.players.filter(p => p.cashout !== null && p.cashoutAt).map(p => p.cashoutAt).sort();
-  s.endDate = times.length ? times[times.length - 1] : null;
-  return s;
-};
-
-// Appends a timestamped event to a session's log (mutates & returns the session)
-export const logEvent = (s, type, player, amount) => {
-  s.log = [...(s.log || []), { t: new Date().toISOString(), type, player, ...(amount != null ? { amount } : {}) }];
-  return s;
-};
-
 // Human-readable description of a log entry
 export const logLabel = (e) => {
   switch (e.type) {
@@ -78,22 +64,3 @@ export function exportJSON(sessions) {
   a.href = url; a.download = `poker_backup_${new Date().toISOString().slice(0, 10)}.json`;
   a.click(); URL.revokeObjectURL(url);
 }
-
-// Reconciles local and server session lists after a version conflict, at
-// whole-session granularity. For a session present on both sides the newer
-// per-session updatedAt stamp wins (a copy never touched locally has no stamp
-// and defers to the server). Sessions only one side knows about are kept —
-// except server copies of sessions deleted in this tab, which stay deleted.
-// This can resurrect a session deleted on another device inside the conflict
-// window; that beats silently losing an entry that was just typed in.
-export const mergeSessions = (local, server, deletedIds) => {
-  const merged = new Map();
-  for (const s of server) {
-    if (!deletedIds.has(s.id)) merged.set(s.id, s);
-  }
-  for (const s of local) {
-    const remote = merged.get(s.id);
-    if (!remote || (s.updatedAt || "") > (remote.updatedAt || "")) merged.set(s.id, s);
-  }
-  return [...merged.values()].sort((a, b) => new Date(b.date) - new Date(a.date));
-};
