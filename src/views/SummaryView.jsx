@@ -31,11 +31,6 @@ export default function SummaryView({ session, isAdmin, onResume, onBack, onDele
     }
   };
 
-  const sorted = [...session.players].sort((a, b) => {
-    const pa = a.cashout !== null ? a.cashout - a.buyins.reduce((s, x) => s + x, 0) : -Infinity;
-    const pb = b.cashout !== null ? b.cashout - b.buyins.reduce((s, x) => s + x, 0) : -Infinity;
-    return pb - pa;
-  });
   const totalBuyins = session.players.reduce((a, p) => a + p.buyins.reduce((b, x) => b + x, 0), 0);
   const totalCashouts = session.players.filter(p => p.cashout !== null).reduce((a, p) => a + p.cashout, 0);
   const allCashedOut = session.players.length > 0 && session.players.every(p => p.cashout !== null);
@@ -45,13 +40,13 @@ export default function SummaryView({ session, isAdmin, onResume, onBack, onDele
     ? `${fmtTime(session.date)} – ${fmtTime(session.endDate)} · ${fmtDuration(new Date(session.endDate) - new Date(session.date))}`
     : null;
 
+  // Join order, not net ranking — it's a home game, not a leaderboard.
   const PlayerTableRows = () =>
-    sorted.map((p, i) => {
+    session.players.map((p) => {
       const totalBuyin = p.buyins.reduce((a, x) => a + x, 0);
       const profit = p.cashout !== null ? p.cashout - totalBuyin : null;
       return (
         <div key={p.id} style={S.summaryTableRow}>
-          <span style={{ flex: 0.4, textAlign: "center", color: "#7a5030", fontSize: 12 }}>{i + 1}</span>
           <span style={{ flex: 1.3, minWidth: 0, fontWeight: 600, color: "#2a0a08", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
           <span data-num="1" style={{ flex: 1.7, textAlign: "right", color: "#2a0a08" }}>{fmtMoney(totalBuyin)}</span>
           <span data-num="1" style={{ flex: 1.7, textAlign: "right", color: "#2a0a08" }}>{p.cashout !== null ? fmtMoney(p.cashout) : "—"}</span>
@@ -62,7 +57,7 @@ export default function SummaryView({ session, isAdmin, onResume, onBack, onDele
 
   return (
     <div style={S.content}>
-      <div ref={cardRef} style={S.summaryCard}>
+      <div ref={cardRef} data-share-card style={S.summaryCard}>
         <div style={S.summaryHeader}>
           <div>
             <h2 data-share-title style={S.summaryTitle}>{session.name}</h2>
@@ -70,8 +65,7 @@ export default function SummaryView({ session, isAdmin, onResume, onBack, onDele
           </div>
         </div>
         <div style={{ ...S.summaryTable, margin: "16px 12px" }}>
-          <div style={S.summaryTableHead}>
-            <span style={{ flex: 0.4, textAlign: "center" }}>#</span>
+          <div data-share-muted style={S.summaryTableHead}>
             <span style={{ flex: 1.3 }}>Player</span>
             <span style={{ flex: 1.7, textAlign: "right" }}>Buy-in</span>
             <span style={{ flex: 1.7, textAlign: "right" }}>Cash Out</span>
@@ -79,7 +73,6 @@ export default function SummaryView({ session, isAdmin, onResume, onBack, onDele
           </div>
           <PlayerTableRows />
           <div style={S.summaryTableTotalRow}>
-            <span style={{ flex: 0.4 }}/>
             <span style={{ flex: 1.3, fontWeight: 700 }}>Total</span>
             <span data-num="1" style={{ flex: 1.7, textAlign: "right", fontWeight: 700 }}>{fmtMoney(totalBuyins)}</span>
             <span data-num="1" style={{ flex: 1.7, textAlign: "right", fontWeight: 700 }}>{fmtMoney(totalCashouts)}</span>

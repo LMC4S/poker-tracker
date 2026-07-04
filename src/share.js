@@ -24,11 +24,27 @@ export async function shareCardImage(node, filename = "poker-session.png", opts 
   } catch { /* font loading is best-effort */ }
 
   const canvas = await html2canvas(node, {
-    backgroundColor: "#f0e0c4", // matches S.summaryCard
+    backgroundColor: "#ffffff", // shared image is monochrome, not vintage
     scale: 3,                   // crisp on retina / when zoomed in chat
     useCORS: true,
     // Mutate the clone only — the on-screen card is untouched.
     onclone: (doc) => {
+      // The image that lands in the group chat is plain black-on-white; the
+      // vintage parchment theme stays in the app.
+      const card = doc.querySelector("[data-share-card]");
+      if (card) {
+        card.querySelectorAll("*").forEach(el => {
+          el.style.color = "#161616";
+          el.style.background = "transparent";
+          el.style.borderColor = "#e2e2e2"; // only recolors existing borders
+        });
+        card.style.background = "#ffffff";
+        card.style.borderColor = "#e2e2e2";
+        card.querySelectorAll("[data-share-muted], [data-share-sub]").forEach(el => {
+          el.style.color = "#8a8a8a";
+          el.querySelectorAll("*").forEach(c => { c.style.color = "#8a8a8a"; });
+        });
+      }
       // Numbers render in an elegant serif on screen; swap them to a plain,
       // readable sans in the shared image. Regular weight throughout — Inter
       // bold comes out heavy and lumpy once rasterized.
