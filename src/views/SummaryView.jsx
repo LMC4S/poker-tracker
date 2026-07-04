@@ -4,8 +4,10 @@ import { shareCardImage } from "../share";
 import { S, F } from "../styles";
 import { ChevronIcon } from "../components/icons";
 import QRModal from "../components/QRModal";
+import EditableName from "../components/EditableName";
+import EditableAmount from "../components/EditableAmount";
 
-export default function SummaryView({ session, isAdmin, onResume, onBack, onDelete, onRevoke, onRegenerate }) {
+export default function SummaryView({ session, isAdmin, onResume, onBack, onDelete, onRevoke, onRegenerate, onRename, onEditCashout }) {
   const cardRef = useRef(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showQR, setShowQR] = useState(false);
@@ -47,9 +49,9 @@ export default function SummaryView({ session, isAdmin, onResume, onBack, onDele
       const profit = p.cashout !== null ? p.cashout - totalBuyin : null;
       return (
         <div key={p.id} style={S.summaryTableRow}>
-          <span style={{ flex: 1.3, minWidth: 0, fontWeight: 600, color: "#2a0a08", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+          <EditableName name={p.name} canEdit={isAdmin} onRename={(name) => onRename(p.id, name)} style={{ flex: 1.3, minWidth: 0, fontWeight: 600, color: "#2a0a08", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} />
           <span data-num="1" style={{ flex: 1.7, textAlign: "right", color: "#2a0a08" }}>{fmtMoney(totalBuyin)}</span>
-          <span data-num="1" style={{ flex: 1.7, textAlign: "right", color: "#2a0a08" }}>{p.cashout !== null ? fmtMoney(p.cashout) : "—"}</span>
+          <span data-num="1" style={{ flex: 1.7, textAlign: "right", color: "#2a0a08" }}>{p.cashout !== null ? <EditableAmount amount={p.cashout} canEdit={isAdmin} onEdit={(amount) => onEditCashout(p.id, amount)} /> : "—"}</span>
           <span data-num="1" style={{ flex: 1.7, textAlign: "right", fontWeight: 700, color: profit !== null ? profitColor(profit) : "#707070" }}>{profit !== null ? fmt(profit) : "—"}</span>
         </div>
       );

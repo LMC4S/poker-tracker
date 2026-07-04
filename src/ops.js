@@ -57,6 +57,16 @@ export function applyOp(session, op) {
       recomputeEndDate(s);
       break;
     }
+    case "editCashout": {
+      // Corrects the amount of an existing cash-out. cashoutAt is deliberately
+      // untouched: the original time stands, so a next-day fix never shifts
+      // the session's derived end date. "Player got back in" is undoCashout.
+      const p = s.players.find(x => x.id === payload.playerId);
+      if (!p || p.cashout === null || typeof payload.amount !== "number" || payload.amount < 0 || payload.amount === p.cashout) return session;
+      p.cashout = payload.amount;
+      logEvent(s, at, "edit", p.name, payload.amount);
+      break;
+    }
     case "undoCashout": {
       const p = s.players.find(x => x.id === payload.playerId);
       if (!p) return session;
@@ -64,6 +74,15 @@ export function applyOp(session, op) {
       p.cashoutAt = null;
       logEvent(s, at, "undo", p.name);
       recomputeEndDate(s);
+      break;
+    }
+    case "renamePlayer": {
+      const p = s.players.find(x => x.id === payload.playerId);
+      const name = (payload.name || "").trim();
+      if (!p || !name || name === p.name) return session;
+      if (s.players.some(x => x.id !== p.id && x.name.toLowerCase() === name.toLowerCase())) return session;
+      s.log = [...(s.log || []), { t: at, type: "rename", player: p.name, to: name }];
+      p.name = name;
       break;
     }
     case "removePlayer": {

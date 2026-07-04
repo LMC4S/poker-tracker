@@ -7,8 +7,8 @@ import { applyOp, makeSession } from "../src/ops.js";
 const CAS_ATTEMPTS = 3;
 
 const OP_TYPES = new Set([
-  "createSession", "addPlayer", "rebuy", "cashout", "undoCashout",
-  "removePlayer", "endSession", "reopenSession", "deleteSession",
+  "createSession", "addPlayer", "rebuy", "cashout", "editCashout", "undoCashout",
+  "renamePlayer", "removePlayer", "endSession", "reopenSession", "deleteSession",
   "revokeShare", "regenerateShare",
 ]);
 

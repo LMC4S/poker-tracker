@@ -3,6 +3,8 @@ import { fmtMoney, fmt, profitColor, logLabel, fmtDuration } from "../utils";
 import { S, F } from "../styles";
 import { PlusIcon, TrashIcon } from "../components/icons";
 import QRModal from "../components/QRModal";
+import EditableName from "../components/EditableName";
+import EditableAmount from "../components/EditableAmount";
 
 export default function ActiveView({ session, isAdmin, actions, setModal, onEnd, onRevoke, onRegenerate }) {
   const [confirmingId, setConfirmingId] = useState(null);
@@ -23,11 +25,18 @@ export default function ActiveView({ session, isAdmin, actions, setModal, onEnd,
   const removePlayer = (pid) => actions.removePlayer(session.id, pid);
   const undoCashout = (pid) => actions.undoCashout(session.id, pid);
 
+  // Once everyone is cashed out the night is settled: freeze the clock at the
+  // derived end (last cash-out) so a next-day reopen for bookkeeping doesn't
+  // tick toward a bogus 14h. Anyone still uncashed means live play — keep ticking.
+  const runningMs = allCashedOut && session.endDate
+    ? new Date(session.endDate) - new Date(session.date)
+    : Date.now() - new Date(session.date).getTime();
+
   return (
     <div style={S.content}>
       <div style={S.sessionHeader}>
         <h2 style={S.sessionName}>{session.name}</h2>
-        <div style={S.sessionMeta}>{new Date(session.date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} · {session.players.length} players · ● Running {fmtDuration(Date.now() - new Date(session.date).getTime())}</div>
+        <div style={S.sessionMeta}>{new Date(session.date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} · {session.players.length} players · ● Running {fmtDuration(runningMs)}</div>
       </div>
 
       <div style={S.actions}>
@@ -64,7 +73,7 @@ export default function ActiveView({ session, isAdmin, actions, setModal, onEnd,
 
             return (
               <div key={p.id} style={S.tableRow}>
-                <span style={{ flex: 1.4, minWidth: 0, fontWeight: 600, color: "#2a0a08", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+                <EditableName name={p.name} canEdit={isAdmin} onRename={(name) => actions.renamePlayer(session.id, p.id, name)} style={{ flex: 1.4, minWidth: 0, fontWeight: 600, color: "#2a0a08", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} />
                 <span style={{ flex: 1.7, display: "flex", flexDirection: "column", alignItems: "flex-end", color: "#2a0a08" }}>
                   <span>{fmtMoney(totalBuyin)}</span>
                   {p.buyins.length > 1 && <span style={{ color: "#7a5030", fontSize: 11, marginTop: 1, lineHeight: 1.2 }}>{p.buyins.map(b => fmtMoney(b)).join(" + ")}</span>}
@@ -72,7 +81,7 @@ export default function ActiveView({ session, isAdmin, actions, setModal, onEnd,
                 <span style={{ flex: 1.7, textAlign: "right", color: p.cashout !== null ? "#2a0a08" : "#7a5030", display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 4 }}>
                   {p.cashout !== null ? (
                     <>
-                      {fmtMoney(p.cashout)}
+                      <EditableAmount amount={p.cashout} canEdit={isAdmin} onEdit={(amount) => actions.editCashout(session.id, p.id, amount)} />
                       {isAdmin && <button onClick={() => undoCashout(p.id)} style={{ ...S.tinyBtn, color: "#450206" }} title="Undo">↺</button>}
                     </>
                   ) : !isAdmin ? "—" : (

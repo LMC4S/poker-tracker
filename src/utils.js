@@ -39,8 +39,10 @@ export const logLabel = (e) => {
     case "join":    return e.amount ? `${e.player} joined · ${fmtMoney(e.amount)}` : `${e.player} joined`;
     case "buyin":   return `${e.player} rebuy · ${fmtMoney(e.amount)}`;
     case "cashout": return `${e.player} cashed out · ${fmtMoney(e.amount)}`;
+    case "edit":    return `${e.player} cash-out corrected · ${fmtMoney(e.amount)}`;
     case "undo":    return `${e.player} cash-out undone`;
     case "remove":  return `${e.player} removed`;
+    case "rename":  return `${e.player} renamed to ${e.to}`;
     default:        return e.player;
   }
 };

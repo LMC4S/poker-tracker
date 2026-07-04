@@ -177,8 +177,10 @@ function AppContent({ isAdmin }) {
     addPlayer: (name, buyin) => dispatch("addPlayer", activeId, { playerId: uid(), name, buyin }),
     rebuy: (playerId, amount) => dispatch("rebuy", activeId, { playerId, amount }),
     cashout: (playerId, amount) => dispatch("cashout", activeId, { playerId, amount }),
+    editCashout: (sessionId, playerId, amount) => dispatch("editCashout", sessionId, { playerId, amount }),
     undoCashout: (sessionId, playerId) => dispatch("undoCashout", sessionId, { playerId }),
     removePlayer: (sessionId, playerId) => dispatch("removePlayer", sessionId, { playerId }),
+    renamePlayer: (sessionId, playerId, name) => dispatch("renamePlayer", sessionId, { playerId, name }),
     endSession: (id) => {
       dispatch("endSession", id);
       setSummaryId(id);
@@ -226,7 +228,7 @@ function AppContent({ isAdmin }) {
       <Header view={view} setView={setView} activeId={activeId} isAdmin={isAdmin} />
       {view === "home"    && <HomeView sessions={sessions} isAdmin={isAdmin} onNew={() => setModal({ type: "newSession" })} onOpen={openSession} />}
       {view === "active"  && activeSession  && <ActiveView session={activeSession} isAdmin={isAdmin} actions={actions} setModal={setModal} onEnd={() => actions.endSession(activeId)} onRevoke={actions.revokeShare} onRegenerate={actions.regenerateShare} />}
-      {view === "summary" && summarySession && <SummaryView session={summarySession} isAdmin={isAdmin} onResume={() => actions.resumeSession(summaryId)} onBack={() => setView("home")} onDelete={actions.deleteSession} onRevoke={actions.revokeShare} onRegenerate={actions.regenerateShare} />}
+      {view === "summary" && summarySession && <SummaryView session={summarySession} isAdmin={isAdmin} onResume={() => actions.resumeSession(summaryId)} onBack={() => setView("home")} onDelete={actions.deleteSession} onRevoke={actions.revokeShare} onRegenerate={actions.regenerateShare} onRename={(playerId, name) => actions.renamePlayer(summaryId, playerId, name)} onEditCashout={(playerId, amount) => actions.editCashout(summaryId, playerId, amount)} />}
       {isAdmin && modal && <Modal modal={modal} setModal={setModal} sessions={sessions} activeSession={activeSession} actions={actions} />}
     </div>
   );
