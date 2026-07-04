@@ -4,9 +4,27 @@ import { F, FB } from "../styles";
 
 export default function QRModal({ session, onClose, onRevoke, onRegenerate }) {
   const canvasRef = useRef(null);
-  // "revoke" | "regen" | null — inline confirm step for link-breaking actions
-  const [confirm, setConfirm] = useState(null);
+  // Inline confirm step before revoking (the one link-breaking action; a new
+  // link is created from the sharing-off state, so no separate replace flow)
+  const [confirm, setConfirm] = useState(false);
+  const [copied, setCopied] = useState(false);
   const url = session.shareToken ? `${window.location.origin}/s/${session.shareToken}` : null;
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // Clipboard API unavailable (old WebView/http): legacy path
+      const ta = document.createElement("textarea");
+      ta.value = url;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  };
 
   const dateTag = new Date(session.date).toLocaleDateString(undefined, { year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\//g, "-");
   const safeName = session.name.replace(/[^a-z0-9]/gi, "-").toLowerCase();
@@ -56,28 +74,28 @@ export default function QRModal({ session, onClose, onRevoke, onRegenerate }) {
           <button onClick={onClose} style={btnGhost}>Close</button>
         </div>
 
-        {url && (onRevoke || onRegenerate) && (
+        {url && (
           confirm ? (
             <div style={{ marginTop: 16 }}>
               <div style={{ fontSize: 11, color: "#7a5030", letterSpacing: "0.5px", marginBottom: 10, lineHeight: 1.5 }}>
-                {confirm === "revoke"
-                  ? "Turn off sharing? Anyone with the link or QR loses access."
-                  : "Replace the link? Old links and saved QR codes stop working."}
+                Turn off sharing? Anyone with the link or QR loses access.
               </div>
               <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
-                <button onClick={() => setConfirm(null)} style={btnGhost}>Cancel</button>
+                <button onClick={() => setConfirm(false)} style={btnGhost}>Cancel</button>
                 <button
-                  onClick={() => { (confirm === "revoke" ? onRevoke : onRegenerate)(session.id); setConfirm(null); }}
+                  onClick={() => { onRevoke(session.id); setConfirm(false); }}
                   style={{ ...btnPrimary, background: "#7a1c12" }}
                 >
-                  {confirm === "revoke" ? "Revoke" : "Replace"}
+                  Revoke
                 </button>
               </div>
             </div>
           ) : (
             <div style={{ marginTop: 16, display: "flex", gap: 14, justifyContent: "center" }}>
-              {onRevoke && <button onClick={() => setConfirm("revoke")} style={btnLink}>Revoke Link</button>}
-              {onRegenerate && <button onClick={() => setConfirm("regen")} style={btnLink}>New Link</button>}
+              <button onClick={copyLink} style={{ ...btnLink, color: copied ? "#2d5a2d" : btnLink.color }}>
+                {copied ? "Copied" : "Copy Link"}
+              </button>
+              {onRevoke && <button onClick={() => setConfirm(true)} style={btnLink}>Revoke Link</button>}
             </div>
           )
         )}
