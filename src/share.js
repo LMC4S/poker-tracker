@@ -23,9 +23,11 @@ export async function shareCardImage(node, filename = "poker-session.png", opts 
     // Mutate the clone only — the on-screen card is untouched.
     onclone: (doc) => {
       // Numbers render in an elegant serif on screen; swap them to a plain,
-      // readable sans in the shared image.
+      // readable sans in the shared image. Regular weight throughout — Inter
+      // bold comes out heavy and lumpy once rasterized.
       doc.querySelectorAll("[data-num]").forEach(el => {
         el.style.fontFamily = "'Inter', sans-serif";
+        el.style.fontWeight = "400";
       });
       // Keep a generic "Session N" name (and the session count it leaks) out
       // of the public image by showing the date instead.
