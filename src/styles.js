@@ -1,7 +1,7 @@
 export const F = "'Oswald', sans-serif";
 export const FB = "'Cormorant Garamond', Georgia, serif";
-// Money/number cells: the serif's figures are too thin at table sizes, so
-// tables use the same plain sans the share image renders with.
+// Share-image-only sans: on screen everything stays serif for a unified look
+// (tried Inter for table numbers 2026-07-04 — felt disjointed, reverted).
 export const FN = "'Inter', sans-serif";
 
 export const S = {
@@ -22,7 +22,7 @@ export const S = {
   cardHeader: { display: "flex", justifyContent: "space-between", alignItems: "center" },
   cardTitle: { fontSize: 16, fontWeight: 600, color: "#2a0a08", letterSpacing: "0.5px" },
   cardSub: { fontSize: 13, color: "#5c3020", marginTop: 2, letterSpacing: "0.5px" },
-  cardPot: { fontSize: 14, fontWeight: 600, color: "#450206", fontFamily: FN },
+  cardPot: { fontSize: 15, fontWeight: 700, color: "#450206" },
   liveBadge: { background: "rgba(69,2,6,0.12)", color: "#450206", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 3, letterSpacing: 1.5, border: "1px solid rgba(69,2,6,0.3)", textTransform: "uppercase", fontFamily: F },
   sessionHeader: { marginBottom: 16 },
   sessionName: { fontSize: 24, fontWeight: 700, color: "#2a0a08", margin: 0, letterSpacing: "1px" },

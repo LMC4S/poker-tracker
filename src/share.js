@@ -13,7 +13,7 @@ export async function shareCardImage(node, filename = "poker-session.png", opts 
   const FONT_WEIGHTS = {
     "Oswald": ["400", "600", "700"],
     "Cormorant Garamond": ["400", "600", "700"],
-    "Inter": ["400", "600"],
+    "Inter": ["400"],
   };
   try {
     await Promise.all(
