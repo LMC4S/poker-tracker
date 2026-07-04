@@ -35,7 +35,7 @@ Each session has its own link of the form `https://<app>.vercel.app/s/<token>`. 
 - Buy-ins, rebuys, tap-to-cash-out, and undo, with player-name autocomplete from past games
 - Timestamped activity log for every buy-in, rebuy, and cash-out
 - Session end time recorded automatically from the last cash-out
-- Series stats across all games — sessions played, typical buy-in, longest session, biggest swing
+- Series stats that move with every game — sessions this year, days since the last night, money on the table this year, and last night's top win (the winner's name is shown to the host only, never to link viewers)
 - Entries can't be lost to bad wifi — every action is a tiny operation queued on the device, retried until the server confirms it, and applied exactly once; an entry made with no signal survives a page refresh and syncs when signal returns
 - Conflict-free multi-admin editing — each session versions independently, so two devices editing different sessions never collide, and the server keeps a permanent audit trail of every operation
 - One-click JSON backup of all data

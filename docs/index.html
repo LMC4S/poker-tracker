@@ -316,7 +316,12 @@ vite.config.js         Dev server opens /admin</code></pre>
       <li><b>Admin:</b> HomeView computes them client-side from the full array it already holds.</li>
       <li><b>Observer:</b> <code>computeSeriesStats()</code> in <a href="../session.js">session.js</a> runs server-side over the full history and returns only the aggregate numbers alongside the single session.</li>
     </ul>
-    <p>Fields: <code>sessionsThisYear</code>, <code>typicalBuyin</code> (median buy-in), <code>longestSession</code> (h/m from date→endDate), <code>biggestWin</code>, <code>biggestLoss</code>, <code>thisYear</code>. All derived only from <code>ended</code> sessions.</p>
+    <p>The stats are deliberately "pulse" stats — every one moves after each game night, rather than all-time records that rarely change.</p>
+    <p>Fields: <code>sessionsThisYear</code>, <code>moneyThisYear</code> (total buy-ins across this year's sessions), <code>lastDate</code> (start date of the most recent ended session), <code>lastWin</code> (top net result of that session), <code>thisYear</code>. All derived only from <code>ended</code> sessions. Two asymmetries between the paths:</p>
+    <ul>
+      <li><code>lastWinName</code> exists only in the admin's client-side computation — the server payload never includes player names, so observers see the top-win amount without a name.</li>
+      <li>"Days since last night" is derived on the client from <code>lastDate</code>, because the serverless function runs on a UTC clock and its response is edge-cached — a precomputed day count could be stale or off by one across timezones.</li>
+    </ul>
 
     <h2 id="concurrency">Concurrency &amp; recovery</h2>
     <p>The failure mode this design targets is an entry silently lost on a flaky mobile connection. The guarantees, and where each comes from:</p>

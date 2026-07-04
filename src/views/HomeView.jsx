@@ -10,46 +10,44 @@ export default function HomeView({ sessions, isAdmin, onNew, onOpen, precomputed
   const activeSessions = sessions.filter(s => !s.ended);
   const endedSessions = sessions.filter(s => s.ended).sort((a, b) => new Date(b.date) - new Date(a.date));
 
+  // Mirrors computeSeriesStats in api/session.js (share viewers get that one as
+  // precomputedStats, minus lastWinName — names never leave the server)
   const seriesStats = useMemo(() => {
     if (precomputedStats) return precomputedStats;
     const ended = sessions.filter(s => s.ended);
     const thisYear = new Date().getFullYear();
 
-    const sessionsThisYear = ended.filter(s => new Date(s.date).getFullYear() === thisYear).length;
+    const endedThisYear = ended.filter(s => new Date(s.date).getFullYear() === thisYear);
+    const sessionsThisYear = endedThisYear.length;
 
-    const allBuyins = [];
-    ended.forEach(s => s.players.forEach(p => {
-      const total = p.buyins.reduce((a, x) => a + x, 0);
-      if (total > 0) allBuyins.push(total);
-    }));
-    const sortedBuyins = [...allBuyins].sort((a, b) => a - b);
-    const mid = Math.floor(sortedBuyins.length / 2);
-    const typicalBuyin = sortedBuyins.length > 0
-      ? sortedBuyins.length % 2 !== 0 ? sortedBuyins[mid] : (sortedBuyins[mid - 1] + sortedBuyins[mid]) / 2
+    const moneyThisYear = endedThisYear.length > 0
+      ? endedThisYear.reduce((sum, s) =>
+          sum + s.players.reduce((a, p) => a + p.buyins.reduce((x, y) => x + y, 0), 0), 0)
       : null;
 
-    let longestMs = 0;
-    ended.forEach(s => {
-      if (s.date && s.endDate) {
-        const ms = new Date(s.endDate) - new Date(s.date);
-        if (ms > longestMs) longestMs = ms;
-      }
-    });
-    const longestSession = longestMs > 0
-      ? `${Math.floor(longestMs / 3600000)}h ${Math.floor((longestMs % 3600000) / 60000)}m`
-      : null;
+    const last = ended.reduce((best, s) =>
+      !best || new Date(s.date) > new Date(best.date) ? s : best, null);
 
-    let biggestWin = null;
-    let biggestLoss = null;
-    ended.forEach(s => s.players.forEach(p => {
-      if (p.cashout === null) return;
-      const profit = p.cashout - p.buyins.reduce((a, x) => a + x, 0);
-      if (biggestWin === null || profit > biggestWin) biggestWin = profit;
-      if (biggestLoss === null || profit < biggestLoss) biggestLoss = profit;
-    }));
+    let lastWin = null, lastWinName = null;
+    if (last) {
+      last.players.forEach(p => {
+        if (p.cashout === null) return;
+        const profit = p.cashout - p.buyins.reduce((a, x) => a + x, 0);
+        if (lastWin === null || profit > lastWin) { lastWin = profit; lastWinName = p.name; }
+      });
+    }
 
-    return { sessionsThisYear, typicalBuyin, longestSession, biggestWin, biggestLoss, thisYear };
+    return { sessionsThisYear, moneyThisYear, lastDate: last ? last.date : null, lastWin, lastWinName, thisYear };
   }, [sessions, precomputedStats]);
+
+  // Day math stays client-side (the server clock is UTC and its response is
+  // edge-cached, so a precomputed "days since" could be stale or off by one)
+  const daysSinceLast = (() => {
+    if (!seriesStats.lastDate) return null;
+    const d0 = new Date(seriesStats.lastDate); d0.setHours(0, 0, 0, 0);
+    const d1 = new Date(); d1.setHours(0, 0, 0, 0);
+    return Math.round((d1 - d0) / 86400000);
+  })();
 
   const hasSeriesData = precomputedStats ? true : sessions.filter(s => s.ended).length > 0;
 
@@ -74,22 +72,27 @@ export default function HomeView({ sessions, isAdmin, onNew, onOpen, precomputed
             </div>
 
             <div>
-              <div style={statValue}>{seriesStats.typicalBuyin !== null ? fmtMoney(Math.round(seriesStats.typicalBuyin)) : "—"}</div>
-              <div style={statLabel}>Typical Buy-in</div>
-            </div>
-
-            <div>
-              <div style={statValue}>{seriesStats.longestSession || "—"}</div>
-              <div style={statLabel}>Longest Session</div>
-            </div>
-
-            <div>
-              <div style={{ fontSize: 32, fontWeight: 700, color: "#2a0a08", lineHeight: 1 }}>
-                {seriesStats.biggestWin !== null ? fmt(seriesStats.biggestWin) : "—"}
-                <span style={{ fontWeight: 300, color: "#b89878", margin: "0 5px" }}>/</span>
-                {seriesStats.biggestLoss !== null ? fmt(seriesStats.biggestLoss) : "—"}
+              <div style={statValue}>
+                {daysSinceLast === null ? "—"
+                  : daysSinceLast <= 0 ? "Tonight"
+                  : `${daysSinceLast} ${daysSinceLast === 1 ? "day" : "days"}`}
               </div>
-              <div style={statLabel}>Best &amp; Worst Night</div>
+              <div style={statLabel}>Since Last Night</div>
+            </div>
+
+            <div>
+              <div style={statValue}>{seriesStats.moneyThisYear !== null ? fmtMoney(seriesStats.moneyThisYear) : "—"}</div>
+              <div style={statLabel}>On the Table in {seriesStats.thisYear}</div>
+            </div>
+
+            <div>
+              <div style={statValue}>
+                {seriesStats.lastWin !== null ? fmt(seriesStats.lastWin) : "—"}
+                {seriesStats.lastWinName && (
+                  <span style={{ fontWeight: 300, fontSize: 16, color: "#7a5030", marginLeft: 8 }}>{seriesStats.lastWinName}</span>
+                )}
+              </div>
+              <div style={statLabel}>Last Night's Top Win</div>
             </div>
 
           </div>

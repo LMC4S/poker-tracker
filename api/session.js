@@ -8,44 +8,36 @@ function getSupabase() {
 }
 
 // Aggregate series stats from the full history. Only these aggregate numbers
-// (no names, no per-session detail) are returned to public viewers.
+// (no names, no per-session detail) are returned to public viewers — so unlike
+// the admin's client-side mirror in src/views/HomeView.jsx, lastWinName is
+// deliberately absent here. lastDate is raw: "days since" is computed on the
+// client, because this function runs on a UTC clock and its response is
+// edge-cached, so a precomputed day count could be stale or off by one.
 function computeSeriesStats(sessions) {
   const ended = sessions.filter(s => s.ended);
   const thisYear = new Date().getFullYear();
 
-  const sessionsThisYear = ended.filter(s => new Date(s.date).getFullYear() === thisYear).length;
+  const endedThisYear = ended.filter(s => new Date(s.date).getFullYear() === thisYear);
+  const sessionsThisYear = endedThisYear.length;
 
-  const allBuyins = [];
-  ended.forEach(s => s.players.forEach(p => {
-    const total = p.buyins.reduce((a, x) => a + x, 0);
-    if (total > 0) allBuyins.push(total);
-  }));
-  const sorted = [...allBuyins].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  const typicalBuyin = sorted.length > 0
-    ? sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
+  const moneyThisYear = endedThisYear.length > 0
+    ? endedThisYear.reduce((sum, s) =>
+        sum + s.players.reduce((a, p) => a + p.buyins.reduce((x, y) => x + y, 0), 0), 0)
     : null;
 
-  let longestMs = 0;
-  ended.forEach(s => {
-    if (s.date && s.endDate) {
-      const ms = new Date(s.endDate) - new Date(s.date);
-      if (ms > longestMs) longestMs = ms;
-    }
-  });
-  const longestSession = longestMs > 0
-    ? `${Math.floor(longestMs / 3600000)}h ${Math.floor((longestMs % 3600000) / 60000)}m`
-    : null;
+  const last = ended.reduce((best, s) =>
+    !best || new Date(s.date) > new Date(best.date) ? s : best, null);
 
-  let biggestWin = null, biggestLoss = null;
-  ended.forEach(s => s.players.forEach(p => {
-    if (p.cashout === null) return;
-    const profit = p.cashout - p.buyins.reduce((a, x) => a + x, 0);
-    if (biggestWin === null || profit > biggestWin) biggestWin = profit;
-    if (biggestLoss === null || profit < biggestLoss) biggestLoss = profit;
-  }));
+  let lastWin = null;
+  if (last) {
+    last.players.forEach(p => {
+      if (p.cashout === null) return;
+      const profit = p.cashout - p.buyins.reduce((a, x) => a + x, 0);
+      if (lastWin === null || profit > lastWin) lastWin = profit;
+    });
+  }
 
-  return { sessionsThisYear, typicalBuyin, longestSession, biggestWin, biggestLoss, thisYear };
+  return { sessionsThisYear, moneyThisYear, lastDate: last ? last.date : null, lastWin, thisYear };
 }
 
 // Public read path for a single shared session, gated by an unguessable token
