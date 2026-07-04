@@ -24,26 +24,35 @@ export async function shareCardImage(node, filename = "poker-session.png", opts 
   } catch { /* font loading is best-effort */ }
 
   const canvas = await html2canvas(node, {
-    backgroundColor: "#ffffff", // shared image is monochrome, not vintage
+    backgroundColor: "#0b0b0b", // must match the card so corners disappear
     scale: 3,                   // crisp on retina / when zoomed in chat
     useCORS: true,
     // Mutate the clone only — the on-screen card is untouched.
     onclone: (doc) => {
-      // The image that lands in the group chat is plain black-on-white; the
-      // vintage parchment theme stays in the app.
+      // The image that lands in the group chat is read at night, so it's
+      // white-on-black with a three-tone hierarchy: pure white for the title
+      // and totals, off-white body rows, gray metadata. The vintage parchment
+      // theme stays in the app.
       const card = doc.querySelector("[data-share-card]");
       if (card) {
         card.querySelectorAll("*").forEach(el => {
-          el.style.color = "#161616";
+          el.style.color = "#f2f2f2";
           el.style.background = "transparent";
-          el.style.borderColor = "#e2e2e2"; // only recolors existing borders
+          el.style.borderColor = "#262626"; // only recolors existing borders
         });
-        card.style.background = "#ffffff";
-        card.style.borderColor = "#e2e2e2";
+        card.style.background = "#0b0b0b";
+        card.style.border = "none";
         card.querySelectorAll("[data-share-muted], [data-share-sub]").forEach(el => {
-          el.style.color = "#8a8a8a";
-          el.querySelectorAll("*").forEach(c => { c.style.color = "#8a8a8a"; });
+          el.style.color = "#8f8f8f";
+          el.querySelectorAll("*").forEach(c => { c.style.color = "#8f8f8f"; });
         });
+        const title = card.querySelector("[data-share-title]");
+        if (title) title.style.color = "#ffffff";
+        const total = card.querySelector("[data-share-total]");
+        if (total) {
+          total.style.background = "#161616";
+          total.querySelectorAll("*").forEach(c => { c.style.color = "#ffffff"; });
+        }
       }
       // Numbers render in an elegant serif on screen; swap them to a plain,
       // readable sans in the shared image. Regular weight throughout — Inter

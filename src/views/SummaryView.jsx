@@ -72,7 +72,7 @@ export default function SummaryView({ session, isAdmin, onResume, onBack, onDele
             <span style={{ flex: 1.7, textAlign: "right" }}>Net</span>
           </div>
           <PlayerTableRows />
-          <div style={S.summaryTableTotalRow}>
+          <div data-share-total style={S.summaryTableTotalRow}>
             <span style={{ flex: 1.3, fontWeight: 700 }}>Total</span>
             <span data-num="1" style={{ flex: 1.7, textAlign: "right", fontWeight: 700 }}>{fmtMoney(totalBuyins)}</span>
             <span data-num="1" style={{ flex: 1.7, textAlign: "right", fontWeight: 700 }}>{fmtMoney(totalCashouts)}</span>
