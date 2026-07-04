@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { fmtMoney, fmt, profitColor, fmtDuration, fmtTime } from "../utils";
 import { shareCardImage } from "../share";
-import { S, F } from "../styles";
+import { S, F, FN } from "../styles";
 import { ChevronIcon } from "../components/icons";
 import QRModal from "../components/QRModal";
 
@@ -53,9 +53,9 @@ export default function SummaryView({ session, isAdmin, onResume, onBack, onDele
         <div key={p.id} style={S.summaryTableRow}>
           <span style={{ flex: 0.4, textAlign: "center", color: "#7a5030", fontSize: 12 }}>{i + 1}</span>
           <span style={{ flex: 1.3, minWidth: 0, fontWeight: 600, color: "#2a0a08", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
-          <span data-num="1" style={{ flex: 1.7, textAlign: "right", color: "#2a0a08" }}>{fmtMoney(totalBuyin)}</span>
-          <span data-num="1" style={{ flex: 1.7, textAlign: "right", color: "#2a0a08" }}>{p.cashout !== null ? fmtMoney(p.cashout) : "—"}</span>
-          <span data-num="1" style={{ flex: 1.7, textAlign: "right", fontWeight: 700, color: profit !== null ? profitColor(profit) : "#707070" }}>{profit !== null ? fmt(profit) : "—"}</span>
+          <span data-num="1" style={{ flex: 1.7, textAlign: "right", color: "#2a0a08", fontFamily: FN, fontSize: 15 }}>{fmtMoney(totalBuyin)}</span>
+          <span data-num="1" style={{ flex: 1.7, textAlign: "right", color: "#2a0a08", fontFamily: FN, fontSize: 15 }}>{p.cashout !== null ? fmtMoney(p.cashout) : "—"}</span>
+          <span data-num="1" style={{ flex: 1.7, textAlign: "right", fontWeight: 600, color: profit !== null ? profitColor(profit) : "#707070", fontFamily: FN, fontSize: 15 }}>{profit !== null ? fmt(profit) : "—"}</span>
         </div>
       );
     });
@@ -81,9 +81,9 @@ export default function SummaryView({ session, isAdmin, onResume, onBack, onDele
           <div style={S.summaryTableTotalRow}>
             <span style={{ flex: 0.4 }}/>
             <span style={{ flex: 1.3, fontWeight: 700 }}>Total</span>
-            <span data-num="1" style={{ flex: 1.7, textAlign: "right", fontWeight: 700 }}>{fmtMoney(totalBuyins)}</span>
-            <span data-num="1" style={{ flex: 1.7, textAlign: "right", fontWeight: 700 }}>{fmtMoney(totalCashouts)}</span>
-            <span data-num="1" style={{ flex: 1.7, textAlign: "right", fontWeight: 700, color: allCashedOut ? profitColor(balance) : "#707070" }}>{allCashedOut ? fmt(balance) : "—"}</span>
+            <span data-num="1" style={{ flex: 1.7, textAlign: "right", fontWeight: 600, fontFamily: FN, fontSize: 15 }}>{fmtMoney(totalBuyins)}</span>
+            <span data-num="1" style={{ flex: 1.7, textAlign: "right", fontWeight: 600, fontFamily: FN, fontSize: 15 }}>{fmtMoney(totalCashouts)}</span>
+            <span data-num="1" style={{ flex: 1.7, textAlign: "right", fontWeight: 600, fontFamily: FN, fontSize: 15, color: allCashedOut ? profitColor(balance) : "#707070" }}>{allCashedOut ? fmt(balance) : "—"}</span>
           </div>
         </div>
       </div>

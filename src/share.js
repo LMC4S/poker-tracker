@@ -1,4 +1,5 @@
 import html2canvas from "html2canvas";
+import { FN } from "./styles";
 
 // Render the visible summary card to a PNG and hand it to the OS share sheet.
 // On iPhone this drops the scoreboard straight into a group chat as an image;
@@ -8,10 +9,16 @@ export async function shareCardImage(node, filename = "poker-session.png", opts 
   const { hideTitle = false, titleReplacement = "", subReplacement = "" } = opts;
 
   // Make sure the webfonts the card uses are ready before we rasterize.
+  // Weights must match what index.html actually loads per family.
+  const FONT_WEIGHTS = {
+    "Oswald": ["400", "600", "700"],
+    "Cormorant Garamond": ["400", "600", "700"],
+    "Inter": ["400", "600"],
+  };
   try {
     await Promise.all(
-      ["Oswald", "Cormorant Garamond", "Inter"].flatMap(f =>
-        ["400", "600", "700"].map(w => document.fonts.load(`${w} 16px '${f}'`))
+      Object.entries(FONT_WEIGHTS).flatMap(([f, weights]) =>
+        weights.map(w => document.fonts.load(`${w} 16px '${f}'`))
       )
     );
   } catch { /* font loading is best-effort */ }
@@ -26,7 +33,7 @@ export async function shareCardImage(node, filename = "poker-session.png", opts 
       // readable sans in the shared image. Regular weight throughout — Inter
       // bold comes out heavy and lumpy once rasterized.
       doc.querySelectorAll("[data-num]").forEach(el => {
-        el.style.fontFamily = "'Inter', sans-serif";
+        el.style.fontFamily = FN;
         el.style.fontWeight = "400";
       });
       // Keep a generic "Session N" name (and the session count it leaks) out

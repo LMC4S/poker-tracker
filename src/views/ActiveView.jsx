@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { fmtMoney, fmt, profitColor, logLabel, fmtDuration } from "../utils";
-import { S, F } from "../styles";
+import { S, F, FN } from "../styles";
 import { PlusIcon, TrashIcon } from "../components/icons";
 import QRModal from "../components/QRModal";
 
@@ -65,11 +65,11 @@ export default function ActiveView({ session, isAdmin, actions, setModal, onEnd,
             return (
               <div key={p.id} style={S.tableRow}>
                 <span style={{ flex: 1.4, minWidth: 0, fontWeight: 600, color: "#2a0a08", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
-                <span style={{ flex: 1.7, display: "flex", flexDirection: "column", alignItems: "flex-end", color: "#2a0a08" }}>
+                <span style={{ flex: 1.7, display: "flex", flexDirection: "column", alignItems: "flex-end", color: "#2a0a08", fontFamily: FN, fontSize: 15 }}>
                   <span>{fmtMoney(totalBuyin)}</span>
                   {p.buyins.length > 1 && <span style={{ color: "#7a5030", fontSize: 11, marginTop: 1, lineHeight: 1.2 }}>{p.buyins.map(b => fmtMoney(b)).join(" + ")}</span>}
                 </span>
-                <span style={{ flex: 1.7, textAlign: "right", color: p.cashout !== null ? "#2a0a08" : "#7a5030", display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 4 }}>
+                <span style={{ flex: 1.7, textAlign: "right", color: p.cashout !== null ? "#2a0a08" : "#7a5030", display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 4, fontFamily: FN, fontSize: 15 }}>
                   {p.cashout !== null ? (
                     <>
                       {fmtMoney(p.cashout)}
@@ -79,7 +79,7 @@ export default function ActiveView({ session, isAdmin, actions, setModal, onEnd,
                     <button onClick={() => setModal({ type: "cashout", playerId: p.id })} style={S.cashoutDash} title="Cash out">—</button>
                   )}
                 </span>
-                <span style={{ flex: 1.7, textAlign: "right", fontWeight: 600, color: profit !== null ? profitColor(profit) : "#707070" }}>
+                <span style={{ flex: 1.7, textAlign: "right", fontWeight: 600, color: profit !== null ? profitColor(profit) : "#707070", fontFamily: FN, fontSize: 15 }}>
                   {profit !== null ? fmt(profit) : "—"}
                 </span>
                 <span style={{ flex: 0.4, textAlign: "right" }}>
@@ -90,9 +90,9 @@ export default function ActiveView({ session, isAdmin, actions, setModal, onEnd,
           })}
           <div style={S.tableTotal}>
             <span style={{ flex: 1.4, fontWeight: 700 }}>Total</span>
-            <span style={{ flex: 1.7, textAlign: "right", fontWeight: 700 }}>{fmtMoney(totalBuyins)}</span>
-            <span style={{ flex: 1.7, textAlign: "right", fontWeight: 700 }}>{cashedOutCount > 0 ? fmtMoney(totalCashouts) : "—"}</span>
-            <span style={{ flex: 1.7, textAlign: "right", fontWeight: 700, color: allCashedOut ? profitColor(balance) : "#707070" }}>{allCashedOut ? fmt(balance) : "—"}</span>
+            <span style={{ flex: 1.7, textAlign: "right", fontWeight: 600, fontFamily: FN, fontSize: 15 }}>{fmtMoney(totalBuyins)}</span>
+            <span style={{ flex: 1.7, textAlign: "right", fontWeight: 600, fontFamily: FN, fontSize: 15 }}>{cashedOutCount > 0 ? fmtMoney(totalCashouts) : "—"}</span>
+            <span style={{ flex: 1.7, textAlign: "right", fontWeight: 600, fontFamily: FN, fontSize: 15, color: allCashedOut ? profitColor(balance) : "#707070" }}>{allCashedOut ? fmt(balance) : "—"}</span>
             <span style={{ flex: 0.4 }}/>
           </div>
         </div>

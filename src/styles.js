@@ -1,5 +1,8 @@
 export const F = "'Oswald', sans-serif";
 export const FB = "'Cormorant Garamond', Georgia, serif";
+// Money/number cells: the serif's figures are too thin at table sizes, so
+// tables use the same plain sans the share image renders with.
+export const FN = "'Inter', sans-serif";
 
 export const S = {
   app: { fontFamily: FB, background: "#fbf0df", color: "#2a0a08", minHeight: "100vh", maxWidth: 600, margin: "0 auto", paddingBottom: 40 },
@@ -19,7 +22,7 @@ export const S = {
   cardHeader: { display: "flex", justifyContent: "space-between", alignItems: "center" },
   cardTitle: { fontSize: 16, fontWeight: 600, color: "#2a0a08", letterSpacing: "0.5px" },
   cardSub: { fontSize: 13, color: "#5c3020", marginTop: 2, letterSpacing: "0.5px" },
-  cardPot: { fontSize: 15, fontWeight: 700, color: "#450206" },
+  cardPot: { fontSize: 14, fontWeight: 600, color: "#450206", fontFamily: FN },
   liveBadge: { background: "rgba(69,2,6,0.12)", color: "#450206", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 3, letterSpacing: 1.5, border: "1px solid rgba(69,2,6,0.3)", textTransform: "uppercase", fontFamily: F },
   sessionHeader: { marginBottom: 16 },
   sessionName: { fontSize: 24, fontWeight: 700, color: "#2a0a08", margin: 0, letterSpacing: "1px" },
@@ -28,10 +31,12 @@ export const S = {
   actionBtn: { padding: "10px 16px", background: "#450206", color: "#ffffff", border: "none", borderRadius: 24, fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, letterSpacing: "1.5px", textTransform: "uppercase", fontFamily: F },
   actionBtnAlt: { padding: "10px 14px", background: "#fbf0df", color: "#450206", border: "1px solid #d4b898", borderRadius: 24, fontSize: 11, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, letterSpacing: "1px", textTransform: "uppercase", fontFamily: F },
   table: { background: "#f0e0c4", border: "1px solid #d4b898", borderRadius: 10, overflow: "hidden", fontVariantNumeric: "lining-nums tabular-nums" },
-  tableHead: { display: "flex", padding: "10px 14px", fontSize: 9, color: "#7a5030", textTransform: "uppercase", letterSpacing: 1.5, borderBottom: "1px solid #d4b898", fontFamily: F },
+  tableHead: { display: "flex", padding: "10px 14px", fontSize: 10, color: "#5c3020", textTransform: "uppercase", letterSpacing: 1.5, borderBottom: "1px solid #d4b898", fontFamily: F },
   tableRow: { display: "flex", padding: "11px 14px", alignItems: "center", borderBottom: "1px solid rgba(212,184,152,0.6)", fontSize: 16 },
   tableTotal: { display: "flex", padding: "11px 14px", alignItems: "center", fontSize: 16, color: "#2a0a08", background: "rgba(69,2,6,0.06)" },
-  tinyBtn: { background: "none", border: "none", cursor: "pointer", padding: 2, opacity: 0.6, display: "inline-flex" },
+  // Padding grows the tap area to ~32px; the negative margin cancels it
+  // visually so the icon sits exactly where a 2px-padded button would.
+  tinyBtn: { background: "none", border: "none", cursor: "pointer", padding: 10, margin: -8, opacity: 0.6, display: "inline-flex" },
   iconBtn: { background: "none", border: "none", cursor: "pointer", padding: 4, opacity: 0.5, display: "inline-flex", borderRadius: 4 },
   endBtn: { width: "100%", padding: "14px", background: "none", color: "#c0392b", border: "1px solid rgba(192,57,43,0.35)", borderRadius: 24, fontSize: 11, fontWeight: 700, cursor: "pointer", marginTop: 20, letterSpacing: "2px", textTransform: "uppercase", fontFamily: F },
   empty: { textAlign: "center", padding: "48px 20px" },
@@ -42,7 +47,7 @@ export const S = {
   summaryTitle: { fontSize: 22, fontWeight: 700, color: "#2a0a08", margin: 0, letterSpacing: "1px" },
   summarySub: { fontSize: 11, color: "#7a5030", marginTop: 2, letterSpacing: "0.5px" },
   summaryTable:{ margin: "0 12px", fontVariantNumeric: "lining-nums tabular-nums", fontFeatureSettings: '"lnum", "tnum"' },
-  summaryTableHead: { display: "flex", padding: "8px 10px", fontSize: 9, color: "#7a5030", textTransform: "uppercase", letterSpacing: 1.5, borderBottom: "1px solid #d4b898", fontFamily: F },
+  summaryTableHead: { display: "flex", padding: "8px 10px", fontSize: 10, color: "#5c3020", textTransform: "uppercase", letterSpacing: 1.5, borderBottom: "1px solid #d4b898", fontFamily: F },
   summaryTableRow: { display: "flex", padding: "10px 10px", alignItems: "center", fontSize: 16, borderBottom: "1px solid rgba(212,184,152,0.5)" },
   summaryTableTotalRow: { display: "flex", padding: "10px 10px", alignItems: "center", fontSize: 16, color: "#2a0a08", background: "rgba(69,2,6,0.06)", borderRadius: "0 0 8px 8px" },
   overlay: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(42,10,8,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 20 },
