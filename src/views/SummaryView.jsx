@@ -1,13 +1,13 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fmtMoney, fmt, profitColor, fmtDuration, fmtTime } from "../utils";
-import { shareCardImage } from "../share";
+import { renderCardBlob, shareCardImage } from "../share";
 import { S, F } from "../styles";
 import { ChevronIcon } from "../components/icons";
 import QRModal from "../components/QRModal";
 import EditableName from "../components/EditableName";
 import EditableAmount from "../components/EditableAmount";
 
-export default function SummaryView({ session, isAdmin, onResume, onBack, onDelete, onRevoke, onRegenerate, onRename, onEditCashout }) {
+export default function SummaryView({ session, isAdmin, onResume, onBack, onDelete, onRevoke, onRegenerate, onRename, onEditCashout, pendingCapture }) {
   const cardRef = useRef(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showQR, setShowQR] = useState(false);
@@ -41,6 +41,19 @@ export default function SummaryView({ session, isAdmin, onResume, onBack, onDele
   const durationStr = session.endDate
     ? `${fmtTime(session.date)} – ${fmtTime(session.endDate)} · ${fmtDuration(new Date(session.endDate) - new Date(session.date))}`
     : null;
+
+  // If End Session started a clipboard write, the ClipboardItem is waiting on
+  // this card — render it now that it's mounted and settle the promise.
+  useEffect(() => {
+    const capture = pendingCapture?.current;
+    if (!capture) return;
+    pendingCapture.current = null;
+    renderCardBlob(cardRef.current, {
+      hideTitle: isGenericName,
+      titleReplacement: dateStr,
+      subReplacement: durationStr || "",
+    }).then(capture.resolve, capture.reject);
+  }, []);
 
   // Join order, not net ranking — it's a home game, not a leaderboard.
   const PlayerTableRows = () =>

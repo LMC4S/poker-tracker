@@ -1,11 +1,10 @@
 import html2canvas from "html2canvas";
 import { FN } from "./styles";
 
-// Render the visible summary card to a PNG and hand it to the OS share sheet.
-// On iPhone this drops the scoreboard straight into a group chat as an image;
-// on desktop (no Web Share for files) it falls back to a download.
-export async function shareCardImage(node, filename = "poker-session.png", opts = {}) {
-  if (!node) return;
+// Render the visible summary card to a white-on-black PNG blob. Throws if the
+// node is missing or rasterization fails — callers decide how to fall back.
+export async function renderCardBlob(node, opts = {}) {
+  if (!node) throw new Error("no card node");
   const { hideTitle = false, titleReplacement = "", subReplacement = "" } = opts;
 
   // Make sure the webfonts the card uses are ready before we rasterize.
@@ -73,7 +72,20 @@ export async function shareCardImage(node, filename = "poker-session.png", opts 
   });
 
   const blob = await new Promise(res => canvas.toBlob(res, "image/png"));
-  if (!blob) return;
+  if (!blob) throw new Error("rasterization failed");
+  return blob;
+}
+
+// Render the card and hand it to the OS share sheet. On iPhone this drops the
+// scoreboard straight into a group chat as an image; on desktop (no Web Share
+// for files) it falls back to a download.
+export async function shareCardImage(node, filename = "poker-session.png", opts = {}) {
+  let blob;
+  try {
+    blob = await renderCardBlob(node, opts);
+  } catch {
+    return;
+  }
 
   const file = new File([blob], filename, { type: "image/png" });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {

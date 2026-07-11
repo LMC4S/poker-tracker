@@ -21,6 +21,13 @@ function AppContent({ isAdmin }) {
   // hidden | saving | offline — reflects the state of the op queue
   const [syncState, setSyncState] = useState("hidden");
   const [pendingCount, setPendingCount] = useState(0);
+  // Ending a session copies the scoreboard PNG to the clipboard. The write must
+  // start inside the tap gesture, but the card only exists once SummaryView has
+  // mounted — so the ClipboardItem gets a promise, and this ref carries its
+  // resolve/reject over to SummaryView, which settles it after rendering.
+  const pendingCaptureRef = useRef(null);
+  const [copiedNotice, setCopiedNotice] = useState(false);
+  const copiedTimerRef = useRef(null);
 
   // Every mutation is an op: applied locally at once, queued in localStorage,
   // and sent to /api/op strictly in order with one in flight. The queue
@@ -182,6 +189,19 @@ function AppContent({ isAdmin }) {
     removePlayer: (sessionId, playerId) => dispatch("removePlayer", sessionId, { playerId }),
     renamePlayer: (sessionId, playerId, name) => dispatch("renamePlayer", sessionId, { playerId, name }),
     endSession: (id) => {
+      if (navigator.clipboard?.write && window.ClipboardItem) {
+        const blob = new Promise((resolve, reject) => {
+          pendingCaptureRef.current = { resolve, reject };
+        });
+        navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
+          .then(() => {
+            setCopiedNotice(true);
+            clearTimeout(copiedTimerRef.current);
+            copiedTimerRef.current = setTimeout(() => setCopiedNotice(false), 5000);
+          })
+          // Silent fallback — the Share Image button is still on the summary
+          .catch(() => { pendingCaptureRef.current = null; });
+      }
       dispatch("endSession", id);
       setSummaryId(id);
       setView("summary");
@@ -225,10 +245,21 @@ function AppContent({ isAdmin }) {
             : "Saving…"}
         </div>
       )}
+      {copiedNotice && (
+        <div style={{
+          position: "fixed", bottom: 28, left: "50%", transform: "translateX(-50%)", zIndex: 300,
+          background: "#7a5030", color: "#fbf0df",
+          padding: "8px 18px", borderRadius: 20, fontSize: 11, fontWeight: 600,
+          letterSpacing: "1px", textTransform: "uppercase", whiteSpace: "nowrap",
+          boxShadow: "0 4px 16px rgba(42,10,8,0.35)"
+        }}>
+          Image copied — paste it in the chat
+        </div>
+      )}
       <Header view={view} setView={setView} activeId={activeId} isAdmin={isAdmin} />
       {view === "home"    && <HomeView sessions={sessions} isAdmin={isAdmin} onNew={() => setModal({ type: "newSession" })} onOpen={openSession} />}
       {view === "active"  && activeSession  && <ActiveView session={activeSession} isAdmin={isAdmin} actions={actions} setModal={setModal} onEnd={() => actions.endSession(activeId)} onRevoke={actions.revokeShare} onRegenerate={actions.regenerateShare} />}
-      {view === "summary" && summarySession && <SummaryView session={summarySession} isAdmin={isAdmin} onResume={() => actions.resumeSession(summaryId)} onBack={() => setView("home")} onDelete={actions.deleteSession} onRevoke={actions.revokeShare} onRegenerate={actions.regenerateShare} onRename={(playerId, name) => actions.renamePlayer(summaryId, playerId, name)} onEditCashout={(playerId, amount) => actions.editCashout(summaryId, playerId, amount)} />}
+      {view === "summary" && summarySession && <SummaryView session={summarySession} isAdmin={isAdmin} pendingCapture={pendingCaptureRef} onResume={() => actions.resumeSession(summaryId)} onBack={() => setView("home")} onDelete={actions.deleteSession} onRevoke={actions.revokeShare} onRegenerate={actions.regenerateShare} onRename={(playerId, name) => actions.renamePlayer(summaryId, playerId, name)} onEditCashout={(playerId, amount) => actions.editCashout(summaryId, playerId, amount)} />}
       {isAdmin && modal && <Modal modal={modal} setModal={setModal} sessions={sessions} activeSession={activeSession} actions={actions} />}
     </div>
   );

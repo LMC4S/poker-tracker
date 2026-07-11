@@ -109,6 +109,13 @@ export default function ActiveView({ session, isAdmin, actions, setModal, onEnd,
         <div style={S.empty}><p style={{ color: "#707070" }}>Add players to get started</p></div>
       )}
 
+      {/* Once the last player cashes out the host's eyes are on the Total row,
+          so the end button moves up under it (filled, unmissable). An off-by-a-
+          few-dollars Net is normal for cash games — never a reason to gate. */}
+      {isAdmin && allCashedOut && (
+        <button onClick={onEnd} style={{ ...S.endBtn, background: "#450206", color: "#ffffff", border: "none" }}>End Session</button>
+      )}
+
       {session.log?.length > 0 && (
         <div style={S.logWrap}>
           <button onClick={() => setShowLog(v => !v)} style={S.logToggle}>
@@ -128,7 +135,7 @@ export default function ActiveView({ session, isAdmin, actions, setModal, onEnd,
         </div>
       )}
 
-      {session.players.length > 0 && isAdmin && (
+      {session.players.length > 0 && isAdmin && !allCashedOut && (
         <button onClick={onEnd} style={S.endBtn}>End Session</button>
       )}
     </div>
