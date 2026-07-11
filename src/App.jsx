@@ -197,7 +197,7 @@ function AppContent({ isAdmin }) {
           .then(() => {
             setCopiedNotice(true);
             clearTimeout(copiedTimerRef.current);
-            copiedTimerRef.current = setTimeout(() => setCopiedNotice(false), 5000);
+            copiedTimerRef.current = setTimeout(() => setCopiedNotice(false), 6000);
           })
           // Silent fallback — the Share Image button is still on the summary
           .catch(() => { pendingCaptureRef.current = null; });
@@ -247,13 +247,13 @@ function AppContent({ isAdmin }) {
       )}
       {copiedNotice && (
         <div style={{
-          position: "fixed", bottom: 28, left: "50%", transform: "translateX(-50%)", zIndex: 300,
-          background: "#7a5030", color: "#fbf0df",
-          padding: "8px 18px", borderRadius: 20, fontSize: 11, fontWeight: 600,
-          letterSpacing: "1px", textTransform: "uppercase", whiteSpace: "nowrap",
-          boxShadow: "0 4px 16px rgba(42,10,8,0.35)"
+          position: "fixed", bottom: 32, left: "50%", transform: "translate(-50%, 0)", zIndex: 300,
+          background: "#450206", color: "#fbf0df", textAlign: "center",
+          padding: "14px 28px", borderRadius: 16, whiteSpace: "nowrap",
+          boxShadow: "0 8px 28px rgba(42,10,8,0.5)", animation: "rise 0.25s ease-out"
         }}>
-          Image copied — paste it in the chat
+          <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "1px", textTransform: "uppercase" }}>✓ Image copied</div>
+          <div style={{ fontSize: 12, marginTop: 4, color: "#e8cdb0", letterSpacing: "0.5px" }}>Paste it in the chat</div>
         </div>
       )}
       <Header view={view} setView={setView} activeId={activeId} isAdmin={isAdmin} />

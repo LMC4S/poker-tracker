@@ -71,6 +71,6 @@ export const S = {
 
 if (typeof document !== "undefined") {
   const el = document.createElement("style");
-  el.textContent = `@keyframes spin{to{transform:rotate(360deg)}} *{box-sizing:border-box} body{margin:0;background:#fbf0df} .recharts-surface{overflow:visible}`;
+  el.textContent = `@keyframes spin{to{transform:rotate(360deg)}} @keyframes rise{from{transform:translate(-50%,20px);opacity:0}to{transform:translate(-50%,0);opacity:1}} *{box-sizing:border-box} body{margin:0;background:#fbf0df} .recharts-surface{overflow:visible}`;
   document.head.appendChild(el);
 }
